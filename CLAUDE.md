@@ -33,7 +33,7 @@ Optional features and installation groups are documented in [`docs/installation.
 
 `maintain.sh` runs dependency freshness and security checks, Ruff, Pyright scoped to `src/`, and the parallel test suite. Full-project Pyright is not the project gate because the ML dependency graph can exhaust Node memory.
 
-The gate does not pass `--ignore-unfixed` to uv-secure, so a transitive CVE with no released fix stops it before Ruff, Pyright and the tests run. This matches the global rule: run and report those three separately. Scanner failures are fatal too. Triaged blockers and the recheck procedure: `Known security-gate blocks` in [`docs/development.md`](docs/development.md).
+The gate does not pass `--ignore-unfixed` to uv-secure, so a transitive CVE with no released fix stops it before Ruff, Pyright and the tests run. Scanner failures are fatal too. The gate also runs `scripts/sync_c2pa_soft_bindings.py --check`, which fails when the packaged C2PA soft-binding registry snapshot is stale; rerun it without `--check` to refresh the snapshot from upstream. Triaged blockers and the recheck procedure: `Known security-gate blocks` in [`docs/development.md`](docs/development.md).
 
 Command, gate, typing, and model-test invariants auto-load from [`.claude/rules/development.md`](.claude/rules/development.md). Environment recovery, CI behavior, and fixture policy live in [`docs/development.md`](docs/development.md).
 
