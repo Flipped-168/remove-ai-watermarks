@@ -2156,6 +2156,13 @@ image sizing, postprocessing, and the public engine
 interface. It delegates model execution to
 [`_internal/watermark_remover.py`](../src/remove_ai_watermarks/_internal/watermark_remover.py).
 
+The engine preserves source transparency for alpha-capable outputs. It captures
+alpha after EXIF orientation is applied and before resizing, then rejoins the
+unchanged alpha plane after restoring the RGB result to the original dimensions
+and applying postprocessing. This also handles palette and colour-key PNG
+transparency; diffusion itself still receives RGB. Regression coverage lives in
+`test_invisible_engine.py::TestTransparency`.
+
 `get_device` in that module answers only `cuda` or `cpu`. An `mps` or `xpu` answer
 would travel one frame to the same CUDA-only refusal while costing a device probe,
 and reporting it implied an Apple-silicon or Intel-GPU path that does not exist.
