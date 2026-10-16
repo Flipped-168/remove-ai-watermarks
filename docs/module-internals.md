@@ -637,6 +637,10 @@ the official C2PA registry. Refresh it with
 upstream schema invariants, records the exact source revision and writes a
 deterministic module. Runtime inspection remains offline, and registry membership
 is name-only evidence rather than proof that a compatible decoder ships.
+`--check`, run by `maintain.sh` and the CI lint job ahead of Ruff, compares the
+snapshot with the live upstream revision, so an upstream registry commit fails
+lint on `main` and on every pull request until the snapshot is refreshed, and the
+Ruff step behind it does not run until then.
 The GitHub API revision lookup sends `GITHUB_TOKEN` (or `GH_TOKEN`) when set,
 because the unauthenticated 60 requests/hour per IP limit is exhausted on
 shared CI runners; `.env.example` documents the variable.
