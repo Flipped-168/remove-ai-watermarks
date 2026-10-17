@@ -469,6 +469,11 @@ detected. Use `--force` when you know the image should be processed:
 remove-ai-watermarks invisible image.png -o clean.png --force
 ```
 
+For transparent inputs, use PNG or WebP output to retain transparency. The engine
+preserves the original alpha channel, including partially transparent edges,
+while regenerating RGB pixels. JPEG output cannot preserve transparency. This
+also applies to `batch --mode invisible`.
+
 ### Choose a strength cohort
 
 `--vendor` selects the cohort the default strength resolves from. `auto`

@@ -311,6 +311,15 @@ class InvisibleEngine:
         with Image.open(image_path) as opened:
             image = ImageOps.exif_transpose(opened)
         orig_size = image.size  # (width, height)
+        # Diffusion only processes RGB. Keep alpha at the original display geometry
+        # (after EXIF, before any resize) and rejoin it after all RGB postprocessing.
+        # Palette and colour-key PNGs can carry transparency without an A band.
+        alpha = (
+            image.convert("RGBA").getchannel("A")
+            if output_path.suffix.lower() in image_io.ALPHA_FORMATS
+            and ("A" in image.getbands() or "transparency" in image.info)
+            else None
+        )
         # Full-res original, kept for the adaptive-polish detail target (image is
         # reassigned to the resized copy below; PIL resize returns a new object).
         reference_pil = image
@@ -369,7 +378,7 @@ class InvisibleEngine:
             # Route those outputs through the same final resize so --no-adaptive-polish does
             # not silently change e.g. 1448x1086 into 1448x1080.
             needs_restore = target is not None or any(dimension % 8 for dimension in orig_size)
-            if humanize > 0.0 or unsharp > 0.0 or adaptive_polish or needs_restore:
+            if humanize > 0.0 or unsharp > 0.0 or adaptive_polish or needs_restore or alpha is not None:
                 import cv2
                 import numpy as np
 
@@ -390,7 +399,13 @@ class InvisibleEngine:
                     progress=self._progress_callback,
                 )
 
-                if not image_io.imwrite(out_path, out_cv, display_tags_from=image_path, orientation_applied=True):
+                if not image_io.write_bgr_with_alpha(
+                    out_path,
+                    out_cv,
+                    np.asarray(alpha) if alpha is not None else None,
+                    display_tags_from=image_path,
+                    orientation_applied=True,
+                ):
                     raise OSError(f"failed to write postprocessed output: {out_path}")
 
             return out_path

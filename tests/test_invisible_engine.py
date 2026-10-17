@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import numpy as np
+import pytest
 from PIL import Image
 
 from remove_ai_watermarks.invisible_engine import (
@@ -162,6 +164,126 @@ class TestNativeOutputSize:
         engine.remove_watermark(src, out, adaptive_polish=False)
 
         assert Image.open(out).size == (24, 18)
+
+
+class TestTransparency:
+    """Exercise real image IO and postprocessing around an RGB-only model stand-in."""
+
+    @staticmethod
+    def _engine():
+        engine = object.__new__(InvisibleEngine)
+        engine._progress_callback = None
+
+        def remove_watermark(image_path, output_path, **_kwargs):
+            with Image.open(image_path) as image:
+                assert image.mode == "RGB"
+                width, height = image.size
+            # Model-side grid rounding and changed pixels, not a copy of the input.
+            Image.new("RGB", (width // 8 * 8, height // 8 * 8), (40, 120, 200)).save(output_path)
+            return output_path
+
+        engine._remover = SimpleNamespace(configured_profile="qwen-zimage", remove_watermark=remove_watermark)
+        return engine
+
+    @staticmethod
+    def _source(mode, size):
+        image = Image.new("RGB", size, (180, 90, 30))
+        alpha = np.resize(np.array([0, 64, 128, 255], dtype=np.uint8), (size[1], size[0]))
+        if mode == "P":
+            image = Image.fromarray(alpha).convert("P")
+            image.info["transparency"] = bytes(range(256))
+        elif mode == "RGB-key":
+            image.paste((0, 0, 0), (0, 0, size[0] // 2, size[1]))
+            image.info["transparency"] = (0, 0, 0)
+        else:
+            image = image.convert(mode)
+            image.putalpha(Image.fromarray(alpha))
+        return image
+
+    @pytest.mark.parametrize("mode", ["RGBA", "LA", "P", "RGB-key"])
+    @pytest.mark.parametrize(("size", "max_resolution"), [((32, 24), 0), ((35, 27), 0), ((32, 24), 16)])
+    def test_preserves_exact_alpha_after_model_and_size_restoration(self, tmp_path, mode, size, max_resolution):
+        source, output = tmp_path / "source.png", tmp_path / "output.png"
+        self._source(mode, size).save(source)
+        with Image.open(source) as image:
+            expected = np.asarray(image.convert("RGBA"))[:, :, 3].copy()
+
+        self._engine().remove_watermark(source, output, max_resolution=max_resolution, adaptive_polish=False)
+
+        with Image.open(output) as image:
+            assert image.mode == "RGBA"
+            assert image.size == size
+            actual = np.asarray(image)
+        np.testing.assert_array_equal(actual[:, :, 3], expected)
+        # Retain the model's RGB result rather than restoring the source image.
+        np.testing.assert_array_equal(actual[:, :, :3], np.broadcast_to([40, 120, 200], actual[:, :, :3].shape))
+
+    @pytest.mark.parametrize("orientation", [2, 6, 7])
+    def test_in_place_output_keeps_alpha_in_display_orientation(self, tmp_path, orientation):
+        from PIL import ImageOps
+
+        source = tmp_path / "source.png"
+        image = self._source("RGBA", (32, 24))
+        image.getexif()[274] = orientation
+        image.save(source)
+        with Image.open(source) as opened:
+            expected = np.asarray(ImageOps.exif_transpose(opened).getchannel("A")).copy()
+
+        self._engine().remove_watermark(source, adaptive_polish=False)
+
+        with Image.open(source) as result:
+            assert result.mode == "RGBA"
+            assert result.getexif().get(274, 1) == 1
+            np.testing.assert_array_equal(np.asarray(result.getchannel("A")), expected)
+
+    def test_webp_keeps_alpha_after_postprocessing(self, tmp_path):
+        source, output = tmp_path / "source.png", tmp_path / "output.webp"
+        image = self._source("RGBA", (32, 24))
+        image.save(source)
+
+        self._engine().remove_watermark(source, output, unsharp=0.5, adaptive_polish=True, humanize=1.0)
+
+        with Image.open(output) as result:
+            assert result.mode == "RGBA"
+            np.testing.assert_array_equal(np.asarray(result.getchannel("A")), np.asarray(image.getchannel("A")))
+
+    @pytest.mark.parametrize(("source_mode", "output_suffix"), [("RGB", ".png"), ("RGBA", ".jpg")])
+    def test_rgb_and_non_alpha_output_remain_rgb(self, tmp_path, source_mode, output_suffix):
+        source, output = tmp_path / "source.png", tmp_path / ("output" + output_suffix)
+        Image.new(source_mode, (32, 24)).save(source)
+
+        self._engine().remove_watermark(source, output, adaptive_polish=False)
+
+        with Image.open(output) as result:
+            assert result.mode == "RGB"
+
+    @pytest.mark.parametrize("command", ["invisible", "batch"])
+    def test_cli_preserves_alpha_through_the_real_engine(self, tmp_path, monkeypatch, command):
+        from click.testing import CliRunner
+
+        from remove_ai_watermarks import invisible_engine
+        from remove_ai_watermarks.cli import main
+
+        source = tmp_path / "source.png"
+        image = self._source("RGBA", (32, 24))
+        image.save(source)
+        engine = self._engine()
+        monkeypatch.setattr(invisible_engine, "InvisibleEngine", lambda **_kwargs: engine)
+        monkeypatch.setattr(invisible_engine, "is_available", lambda: True)
+        if command == "batch":
+            output_dir = tmp_path / "results"
+            args = ["batch", str(tmp_path), "--mode", "invisible", "-o", str(output_dir), "--force"]
+            output = output_dir / "source.png"
+        else:
+            output = tmp_path / "output.png"
+            args = ["invisible", str(source), "-o", str(output), "--force"]
+
+        result = CliRunner().invoke(main, args)
+
+        assert result.exit_code == 0, result.output
+        with Image.open(output) as processed:
+            assert processed.mode == "RGBA"
+            np.testing.assert_array_equal(np.asarray(processed.getchannel("A")), np.asarray(image.getchannel("A")))
 
 
 class TestTargetSize:
