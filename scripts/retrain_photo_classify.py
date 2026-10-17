@@ -98,7 +98,7 @@ def _train_detector(emb: dict[str, np.ndarray], catalog: dict) -> tuple[nn.Modul
             optimizer.zero_grad()
             loss_fn(model(features).squeeze(-1), labels).backward()
             optimizer.step()
-    model.eval()
+    model.train(False)
     dev = np.stack(
         [
             emb[row["sha256"]]
@@ -161,7 +161,7 @@ def _train_provider(feat: dict[str, np.ndarray], catalog: dict) -> dict[str, nn.
                 optimizer.zero_grad()
                 _focal_loss(model(features).squeeze(-1), labels).backward()
                 optimizer.step()
-        heads[name] = model.eval()
+        heads[name] = model.train(False)
         log.info("provider %s pos=%d", name, len(positive))
     return heads
 

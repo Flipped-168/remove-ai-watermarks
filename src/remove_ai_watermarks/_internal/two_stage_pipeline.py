@@ -823,7 +823,7 @@ class TwoStageZImagePipeline:
             torch_dtype=self._face_stage_dtype(),
             **kwargs,
         ).to(self.device)
-        model.eval()
+        model.train(False)
         self._sam_model = model
         self._sam_processor = processor
         return model, processor

@@ -28,6 +28,7 @@ defaults. This page focuses on choosing the right command.
 | `video invisible` and `video all --invisible` | `remove-ai-watermarks[video,diffusion]` plus ffmpeg on PATH |
 | HEIC/HEIF/AVIF pixel input | Add `remove-ai-watermarks[heif]` |
 | Every production command and Python-compatible backend | `remove-ai-watermarks[all]` |
+| `mcp` | Default package; each tool needs the extra of the command it runs |
 
 `batch` requires the same extra as its selected mode. Extras can be combined in
 one installation, for example `remove-ai-watermarks[visible,detect,heif]`.
@@ -689,6 +690,16 @@ For `visible` and `all` modes, the final summary includes counts for
 `no watermark`, `cleaned`, `partial`, and `unvalidated`. Partial and unavailable
 validation results are printed explicitly, but the once-filled outputs are kept
 and the batch does not retry them automatically.
+
+## Serve the CLI to agent clients
+
+```bash
+remove-ai-watermarks mcp
+```
+
+Runs a Model Context Protocol server on stdin and stdout whose `identify`,
+`remove` and `batch` tools each run one command of this CLI. Client setup and
+the tool contract are in the [MCP server guide](mcp-server.md).
 
 ## Exit behavior
 

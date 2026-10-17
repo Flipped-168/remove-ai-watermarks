@@ -173,7 +173,7 @@ def load_model() -> object:
         raise RuntimeError(
             f"PixelSeal checkpoint/source mismatch: missing={loaded.missing_keys}, unexpected={loaded.unexpected_keys}"
         )
-    model.eval()
+    model.train(False)
     return model
 
 

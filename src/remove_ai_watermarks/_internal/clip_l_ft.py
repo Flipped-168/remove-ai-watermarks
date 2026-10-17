@@ -67,7 +67,7 @@ def load_headed_clip(checkpoint: Path, device: torch.device) -> HeadedCLIP:
         model = HeadedCLIP(clip)
     state = torch.load(checkpoint, map_location="cpu", weights_only=True)
     model.load_state_dict(state, strict=True)
-    return model.to(device).eval()
+    return model.to(device).train(False)
 
 
 def load_processor() -> Any:

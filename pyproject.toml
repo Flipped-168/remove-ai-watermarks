@@ -205,6 +205,9 @@ dev = [
     "httpx>=0.28,<1",
     # Development-only isolated browser automation for public provider oracles.
     "playwright>=1.62,<2",
+    # The official MCP client, used only to test `remove-ai-watermarks mcp`
+    # against the reference implementation. The server itself is stdlib-only.
+    "mcp>=2.3,<3",
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
     "pytest-xdist>=3.5.0",

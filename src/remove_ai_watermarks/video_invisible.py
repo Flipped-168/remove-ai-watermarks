@@ -135,7 +135,7 @@ def load_video_vae_runtime(
     dtype = torch.float16 if resolved_device == "cuda" else torch.float32
     log.info("Loading %s on %s", model, resolved_device)
     vae = AutoencoderKL.from_pretrained(model, torch_dtype=dtype).to(resolved_device)
-    vae.eval()
+    vae.train(False)
     vae.enable_slicing()
     scaling_factor = float(vae.config.scaling_factor)
     log.info("Latent scaling factor %.5f", scaling_factor)

@@ -70,6 +70,17 @@ Do these in order after the skill is on the default branch.
      are indexed via clawskills.sh, and the ClawHub prerequisite in step 6 is
      now met. The list still requires proven real-world usage. Re-attempt once
      the ClawHub listing shows organic installs.
+   - `hashgraph-online/awesome-codex-plugins`: READY, not submitted. It lists
+     only Codex plugins, so it needs `.codex-plugin/plugin.json` and the icon in
+     `assets/icon.svg`. Its contribution CI runs `scripts/validate-plugin-pr.py`
+     against the repository's `HEAD.zip`, then the HOL plugin scanner with a
+     minimum score of 80 and no high finding; that scan job is
+     `continue-on-error`, so it reports rather than blocks. The scanner's `\beval\s*\(`
+     rule also matches PyTorch's `.eval()`, which is why the code calls
+     `.train(False)`. On 2026-10-17 `plugin-scanner` 3.49.0 scored the tree 86
+     with no high finding. The remaining loss is a tracked video over the
+     scanner's 16 MiB file budget. Recheck with
+     `uvx --from plugin-scanner==3.49.0 plugin-scanner scan . --min-score 80 --fail-on-severity high`.
 5. **Claude community marketplace.** Form at
    [platform.claude.com/plugins/submit](https://platform.claude.com/plugins/submit)
    (individuals) or the claude.ai directory form (Team/Enterprise). Validate
@@ -191,8 +202,8 @@ that names a command, flag or value the previous release lacked. Left behind, it
 CLI is current right before it types an option that build rejects.
 
 Bump `metadata.version` in `SKILL.md` plus `version` in
-`skills/.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` when
-the skill instructions change. That version is independent of the PyPI package
+`skills/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` and
+`.codex-plugin/plugin.json` when the skill instructions change. That version is independent of the PyPI package
 version.
 
 ## Behavior evals

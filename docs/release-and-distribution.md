@@ -24,9 +24,10 @@ The package version appears in:
 
 - `pyproject.toml`;
 - `src/remove_ai_watermarks/__init__.py`;
+- both `version` fields in `server.json`;
 - the root package entry generated in `uv.lock`.
 
-Update the first two, then refresh the lock file with uv. Do not edit a
+Update the first three, then refresh the lock file with uv. Do not edit a
 line-number-specific location in `uv.lock`; its package order changes.
 
 Before choosing a version, verify it is absent from git tags, GitHub Releases,
@@ -159,7 +160,10 @@ The Agent Skill and Claude plugin live in this repository:
   is the Claude plugin manifest, with source `./skills` so an install copies
   only the skill tree;
 - [`.claude-plugin/marketplace.json`](../.claude-plugin/marketplace.json)
-  makes the repository a Claude Code marketplace.
+  makes the repository a Claude Code marketplace;
+- [`.codex-plugin/plugin.json`](../.codex-plugin/plugin.json) is the Codex
+  plugin manifest, pointing at the same `./skills/` tree, with its icon in
+  [`assets/icon.svg`](../assets/icon.svg).
 
 They are not a fifth required release surface. A CLI change that affects
 command routing, extras, exit codes, mark keys, or the intended-use boundary
@@ -214,6 +218,26 @@ each applicable manual step is verified or explicitly marked pending because
 the catalog has not accepted the initial submission. The catalog-specific
 submission state and links live in
 [`docs/agent-skill.md`](agent-skill.md#where-the-skill-can-actually-be-listed).
+
+## MCP registry
+
+[`server.json`](../server.json) lists the PyPI package in the
+[official MCP registry](https://registry.modelcontextprotocol.io/) as
+`io.github.wiltodelta/remove-ai-watermarks`, started as
+`uvx remove-ai-watermarks mcp`. The registry accepts it only after PyPI serves a
+release whose description, the README, carries the `mcp-name:` marker, and
+`tests/test_mcp_server.py` pins `server.json` to the package version. The listing
+is not a release surface that blocks a release; after PyPI publishes a version:
+
+1. `mcp-publisher login github` with an account that owns `wiltodelta`;
+2. `mcp-publisher validate` and then `mcp-publisher publish` from the
+   repository root;
+3. read the entry back from
+   `https://registry.modelcontextprotocol.io/v0/servers?search=io.github.wiltodelta/remove-ai-watermarks`
+   and check its version.
+
+[`glama.json`](../glama.json) names the maintainer for Glama's claim flow.
+Client setup and the tool contract are in [the MCP server guide](mcp-server.md).
 
 ## Release verification
 

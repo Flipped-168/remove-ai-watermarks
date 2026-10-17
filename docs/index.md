@@ -27,7 +27,8 @@ to run the tool. Use the maintainer references only when changing the code.
 | [Code provenance](code-provenance.md) | Required notices for licensed derivative work. |
 | [Verification plan](verification-plan.md) | Verification methods, completed measurements, and remaining validation gaps. |
 | [Release and distribution](release-and-distribution.md) | PyPI, Homebrew, Hugging Face Space, photo-classify Hub model, ComfyUI Registry, and the release workflow. |
-| [Agent skill](agent-skill.md) | Install and maintain the published Agent Skill and Claude plugin. |
+| [Agent skill](agent-skill.md) | Install and maintain the published Agent Skill, the Claude plugin and the Codex plugin. |
+| [MCP server](mcp-server.md) | Connect an MCP client to `remove-ai-watermarks mcp`, or publish it to the MCP registry. |
 | [Watermarking landscape](watermarking-landscape.md) | Vendor signals and detection approaches. |
 | [SynthID technical reference](synthid.md) | Mechanism, provenance, robustness, regeneration. |
 

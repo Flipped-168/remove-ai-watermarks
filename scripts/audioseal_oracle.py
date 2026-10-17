@@ -121,7 +121,7 @@ def load_pinned_models() -> tuple[object, object]:
         raw = convert_state_dict_for_scriptable_model(raw)
         model = create(config, device="cpu")  # type: ignore[call-arg]
         load_state_dict(model, state_dict=raw)
-        model.eval()
+        model.train(False)
         return model
 
     generator = load(GENERATOR_CARD, "generator_base.pth", AudioSealWMConfig, create_generator)

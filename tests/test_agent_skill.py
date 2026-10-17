@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills" / "remove-ai-watermarks" / "SKILL.md"
 PLUGIN = ROOT / "skills" / ".claude-plugin" / "plugin.json"
 MARKETPLACE = ROOT / ".claude-plugin" / "marketplace.json"
+CODEX_PLUGIN = ROOT / ".codex-plugin" / "plugin.json"
 AGENT_DOC = ROOT / "docs" / "agent-skill.md"
 INSTALL_DOC = ROOT / "docs" / "installation.md"
 INSTALL_REFERENCE = ROOT / "skills" / "remove-ai-watermarks" / "references" / "install.md"
@@ -541,15 +542,16 @@ def test_probe_minimum_version_is_a_release_that_exists() -> None:
     assert current >= probe.MIN_CLI_VERSION, "the probe demands a version the project has not released"
 
 
-def test_skill_version_agrees_across_all_three_manifests() -> None:
-    """Three files carry this version, and a catalog reads a different one from each."""
+def test_skill_version_agrees_across_every_manifest() -> None:
+    """Four files carry this version, and a catalog reads a different one from each."""
     frontmatter = _frontmatter(SKILL.read_text(encoding="utf-8"))
     match = re.search(r'(?m)^\s+version:\s*"?([0-9][^"\n]*?)"?\s*$', frontmatter)
     assert match is not None, "SKILL.md frontmatter no longer carries metadata.version"
     plugin = json.loads(PLUGIN.read_text(encoding="utf-8"))
     marketplace = json.loads(MARKETPLACE.read_text(encoding="utf-8"))
+    codex = json.loads(CODEX_PLUGIN.read_text(encoding="utf-8"))
 
-    assert match.group(1) == plugin["version"] == marketplace["metadata"]["version"]
+    assert match.group(1) == plugin["version"] == marketplace["metadata"]["version"] == codex["version"]
 
 
 def test_a_bad_invocation_shares_the_no_signal_exit_code(tmp_path: Path) -> None:

@@ -138,6 +138,13 @@ user names a device, and never to claim a device the probe did not report.
 Without `-o`, video commands write `<source>_clean` and keep the original.
 Output extension must match the input container.
 
+## MCP server
+
+`remove-ai-watermarks mcp` (new after CLI 0.45.1) serves `identify`, `remove`
+and `batch` as MCP tools over stdin and stdout for MCP clients. It blocks
+waiting for protocol messages, so do not run it from this skill; call the
+commands above directly.
+
 ## Exit codes
 
 | Code | Meaning |

@@ -482,8 +482,22 @@ Claude Code can add this repository as a plugin marketplace:
 /plugin install remove-ai-watermarks@remove-ai-watermarks
 ```
 
+Codex reads the same skill through [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json).
 The skill refuses stock-agency and other third-party paid-asset marks. See
 [the agent skill guide](docs/agent-skill.md).
+
+## MCP server
+
+`remove-ai-watermarks mcp` serves `identify`, `remove` and `batch` as Model
+Context Protocol tools over stdio, each a thin wrapper around one CLI command:
+
+```json
+{"mcpServers": {"remove-ai-watermarks": {"command": "uvx", "args": ["remove-ai-watermarks", "mcp"]}}}
+```
+
+See [the MCP server guide](docs/mcp-server.md).
+
+<!-- mcp-name: io.github.wiltodelta/remove-ai-watermarks -->
 
 ## ComfyUI
 

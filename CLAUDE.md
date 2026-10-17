@@ -40,6 +40,8 @@ Before a release, read [`docs/release-and-distribution.md`](docs/release-and-dis
 
 The published Agent Skill is [`skills/remove-ai-watermarks/`](skills/remove-ai-watermarks/). Update it in the same change as any CLI edit that alters commands, extras, exit codes, mark keys, or the intended-use boundary. Install and publish steps: [`docs/agent-skill.md`](docs/agent-skill.md).
 
+The same skill tree is the Codex plugin (`.codex-plugin/plugin.json`). `remove-ai-watermarks mcp` is a standard-library MCP server that runs one CLI command per tool call; keep it dependency-free, because the MCP registry launches it as a bare `uvx remove-ai-watermarks mcp` that cannot add extras ([`docs/mcp-server.md`](docs/mcp-server.md)).
+
 ## Module architecture
 
 [`docs/module-internals.md`](docs/module-internals.md) is the canonical per-module map, including design decisions, thresholds, calibration history, incident records, and regression guards. Read the relevant section before changing a subsystem.

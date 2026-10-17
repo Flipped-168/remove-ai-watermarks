@@ -1911,5 +1911,19 @@ def cmd_batch(
         raise SystemExit(1)
 
 
+# ── MCP server ──
+@main.command("mcp")
+def cmd_mcp() -> None:
+    """Run a Model Context Protocol server on stdin/stdout.
+
+    Exposes identify, remove and batch as MCP tools for agent clients. Each tool
+    runs one command of this CLI, so results and exit codes match it. Start it as
+    `uvx remove-ai-watermarks mcp` from the client's server configuration.
+    """
+    from remove_ai_watermarks.mcp_server import serve
+
+    serve()
+
+
 if __name__ == "__main__":
     main()

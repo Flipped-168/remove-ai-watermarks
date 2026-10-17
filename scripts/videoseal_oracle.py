@@ -127,7 +127,7 @@ def load_model() -> object:
     import torch
 
     model = torch.jit.load(str(checkpoint_path()), map_location="cpu")
-    model.eval()
+    model.train(False)
     return model
 
 

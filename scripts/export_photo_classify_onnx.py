@@ -51,7 +51,7 @@ def export_onnx(checkpoint: Path, output: Path) -> None:
     if output.exists():
         raise SystemExit(f"refusing to overwrite existing output: {output}")
     output.parent.mkdir(parents=True, exist_ok=True)
-    model = VisionEmbedding(load_headed_clip(checkpoint, torch.device("cpu"))).eval()
+    model = VisionEmbedding(load_headed_clip(checkpoint, torch.device("cpu"))).train(False)
     export_options: dict[str, Any] = {}
     if "dynamo" in inspect.signature(torch.onnx.export).parameters:
         export_options["dynamo"] = False

@@ -467,7 +467,7 @@ def _load_runtime(device: Any, backend: ClassifierBackend = "torch") -> _Runtime
     probe = np.load(_weight_path(folder, PROBE_FILE))
     detector = _build_detector()
     detector.load_state_dict(torch.load(_weight_path(folder, DETECTOR_FILE), map_location="cpu", weights_only=True))
-    detector.to(device).eval()
+    detector.to(device).train(False)
     packed = torch.load(_weight_path(folder, PROVIDER_FILE), map_location="cpu", weights_only=True)
     heads = {}
     for name in PROVIDER_LABELS:
@@ -476,7 +476,7 @@ def _load_runtime(device: Any, backend: ClassifierBackend = "torch") -> _Runtime
             continue
         head = _build_provider_head()
         head.load_state_dict(packed[name])
-        heads[name] = head.to(device).eval()
+        heads[name] = head.to(device).train(False)
     ridge_threshold = float(probe["thr_oi_1pct"])
     mlp_threshold, provider_margin = _operating_point(folder)
     log.info("loaded photo-classify freeze from %s", folder)

@@ -252,7 +252,7 @@ def _lpips_model() -> tuple[Any, Any]:
     import torch
 
     model = lpips.LPIPS(net="alex", verbose=False)
-    model.eval()
+    model.train(False)
     return model, torch
 
 
