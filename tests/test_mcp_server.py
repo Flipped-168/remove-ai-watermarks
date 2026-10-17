@@ -110,7 +110,7 @@ def test_identify_maps_to_the_cli(arguments: dict, expected: list[str]) -> None:
 @pytest.mark.parametrize(
     ("arguments", "expected"),
     [
-        ({"path": "d/a.png"}, ["metadata", "--remove", "-o", "d/a_clean.png", "--", "d/a.png"]),
+        ({"path": "d/a.png"}, ["metadata", "--remove", "-o", str(Path("d/a_clean.png")), "--", "d/a.png"]),
         ({"path": "a.jpg", "mode": "visible"}, ["visible", "-o", "a_clean.jpg", "--", "a.jpg"]),
         ({"path": "a.png", "mode": "all", "output": "o.png"}, ["all", "-o", "o.png", "--", "a.png"]),
         ({"path": "c.mov"}, ["video", "metadata", "--remove", "-o", "c_clean.mov", "--", "c.mov"]),
