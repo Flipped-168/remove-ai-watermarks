@@ -288,8 +288,8 @@ def run_web_batch(
     oracles.verify_batch(manifest_path)
     manifest, results = oracles.load_batch(manifest_path)
     surface = manifest["surface"]
-    if surface == "gemini-web":
-        raise ValueError("gemini-web requires the real Chrome workflow, not isolated Playwright")
+    if oracles.SURFACES[surface].automation == "real_browser":
+        raise ValueError(f"{surface} requires the real Chrome workflow, not isolated Playwright")
     if surface not in PLAYWRIGHT_SURFACES:
         raise ValueError(f"surface {surface} is not a Playwright Web oracle")
     slot = manifest["slot"]

@@ -29,9 +29,9 @@ The unified maintainer entry point is `scripts/provider_oracles.py`; its workflo
 slot schema live in `docs/provider-oracles.md`. Multi-account and multi-network work
 selects each named slot explicitly from the gitignored repository-local
 `.oracle-slots.json` by default and snapshots it into a separate immutable batch
-manifest. A bounded provider check may continue through its finite set of authorized
-account slots after a refusal; do not add new logins, IP rotation, network-route
-failover, unbounded retries, or cross-session result merging. Never commit the local
+manifest. A provider check may use the finite set of configured account slots and surfaces
+after a refusal. Do not add new logins, IP rotation, network-route failover,
+unbounded retries, or cross-session result merging. Never commit the local
 slot file.
 Every manual result stays bound to the exact sanitized upload hash and preserves the
 provider response verbatim.
@@ -39,11 +39,14 @@ provider response verbatim.
 Provider surface selection is API-first. OpenAI and Microsoft use their official API
 adapters before their Web surfaces when the requested media and local configuration are
 supported. Google and Meta currently use Web because this tooling has no usable API route
-for them. Web remains an explicit second surface, never an automatic retry after an API
-refusal, quota response, transport error, or indeterminate verdict.
+for them. A request to use a provider covers every configured surface, including Web,
+without a second confirmation. An API refusal, quota response, transport error, or
+indeterminate verdict stays on that surface and never silently submits the file to Web.
 
 Google Web oracle automation uses only the user's existing authenticated real Chrome
-session and explicit `/u/N/` account index. OpenAI, Microsoft, and Meta Web automation
+session. Gemini uses an explicit `/u/N/` account index. The SynthID Detector at
+`https://synthid.com/` (`synthid-web`) uses the same Chrome profile and does not take a
+`/u/N/` index; its terms forbid driving the page as an automated API. OpenAI, Microsoft, and Meta Web automation
 uses isolated Playwright contexts; it must never attach to or copy state from the user's
 real browser. Proxy credentials are read only through a slot's named environment variable
 and never enter a manifest or log. Dotenv interpolation may derive routed proxy URLs from

@@ -169,6 +169,26 @@ SURFACES: dict[str, OracleSurface] = {
         account_slots=True,
         network_slots=True,
     ),
+    "synthid-web": OracleSurface(
+        key="synthid-web",
+        provider_key="google",
+        provider="Google",
+        signal_family="synthid",
+        surface="SynthID Detector",
+        automation="real_browser",
+        url="https://synthid.com/",
+        media_types=("image", "video", "audio"),
+        project_evidence=(),
+        prompt=None,
+        clean_result_note=(
+            "Record detected only for the explicit label Watermark detected, and not_detected only for "
+            "Watermark not detected. The portal reports partner SynthID from Google DeepMind, Nvidia, "
+            "OpenAI, and Kakao without naming which partner. A not_detected result is not proof of "
+            "human authorship. Preserve quota, sign-in, and unclear wording."
+        ),
+        account_slots=True,
+        network_slots=True,
+    ),
     "meta-web": OracleSurface(
         key="meta-web",
         provider_key="meta",
@@ -278,6 +298,11 @@ def ordered_surfaces() -> list[OracleSurface]:
     return sorted(SURFACES.values(), key=_surface_order)
 
 
+def _automation_keys(automation: str) -> frozenset[str]:
+    """Return the surface keys that use one automation kind."""
+    return frozenset(key for key, surface in SURFACES.items() if surface.automation == automation)
+
+
 def _inside(path: Path, parent: Path) -> bool:
     """Return whether resolved PATH is inside resolved PARENT."""
     try:
@@ -364,6 +389,8 @@ def load_slots(path: Path) -> dict[str, ExecutionSlot]:
         "api_key_env",
     }
     slots: dict[str, ExecutionSlot] = {}
+    real_browser = _automation_keys("real_browser")
+    playwright = _automation_keys("playwright")
     for index, raw_slot in enumerate(slot_items):
         if not isinstance(raw_slot, dict):
             raise ValueError(f"slot {index} must be a JSON object")
@@ -407,19 +434,17 @@ def load_slots(path: Path) -> dict[str, ExecutionSlot]:
             raise ValueError(f"surface {surface_key} requires an account_label")
         if account_label is not None and not SURFACES[surface_key].account_slots:
             raise ValueError(f"surface {surface_key} does not use account slots")
-        if surface_key == "gemini-web" and browser_profile is None:
-            raise ValueError("surface gemini-web requires a browser_profile")
+        if surface_key in real_browser and browser_profile is None:
+            raise ValueError(f"surface {surface_key} requires a browser_profile")
         if surface_key == "gemini-web" and google_account_index is None:
             raise ValueError("surface gemini-web requires a google_account_index")
         if surface_key != "gemini-web" and google_account_index is not None:
             raise ValueError("only gemini-web uses google_account_index")
         if SURFACES[surface_key].automation == "api" and browser_profile is not None:
             raise ValueError(f"API surface {surface_key} does not use a browser_profile")
-        if surface_key != "gemini-web" and browser_profile is not None:
-            raise ValueError("only gemini-web uses a real browser_profile")
-        if surface_key == "gemini-web" and proxy_url_env is not None:
-            raise ValueError("surface gemini-web does not use proxy_url_env")
-        if proxy_url_env is not None and surface_key not in {"openai-web", "microsoft-web", "meta-web"}:
+        if surface_key not in real_browser and browser_profile is not None:
+            raise ValueError("only a real-browser surface uses a browser_profile")
+        if proxy_url_env is not None and surface_key not in playwright:
             raise ValueError(f"surface {surface_key} does not use proxy_url_env")
         if surface_key == "openai-api" and api_key_env is None:
             raise ValueError("surface openai-api requires an api_key_env")
@@ -858,18 +883,17 @@ def list_oracles(as_json: bool) -> None:
 def plan(provider: str, as_json: bool) -> None:
     """Show the API-first surface order for one provider."""
     definitions = provider_plan(provider)
+    has_api = any(definition.automation == "api" for definition in definitions)
     rows = []
-    for index, definition in enumerate(definitions):
+    for definition in definitions:
         row = definition.to_dict()
-        row["preference"] = "primary" if index == 0 else "fallback"
+        row["preference"] = "fallback" if has_api and definition.automation != "api" else "primary"
         rows.append(row)
     if as_json:
         click.echo(json.dumps(rows, indent=2, sort_keys=True))
         return
     for row in rows:
         click.echo(f"{row['preference']}\t{row['key']}\t{row['automation']}\t{row['surface']}")
-    if len(rows) > 1:
-        click.echo("Web fallback requires a separate operator decision; failures do not trigger it automatically.")
 
 
 @cli.command()

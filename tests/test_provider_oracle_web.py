@@ -392,12 +392,14 @@ def test_run_web_batch_requires_explicit_upload_acknowledgement(
         web.run_web_batch(manifest_path, acknowledge_uploads=False)
 
 
+@pytest.mark.parametrize("surface", ["gemini-web", "synthid-web"])
 def test_run_web_batch_refuses_google_real_browser_workflow(
     tmp_path: Path,
     tmp_clean_png: Path,
+    surface: str,
 ) -> None:
     manifest_path = oracles.prepare_batch(
-        "gemini-web",
+        surface,
         [tmp_clean_png],
         output_dir=tmp_path / "oracle-batch",
         repository_root=oracles.REPOSITORY_ROOT,

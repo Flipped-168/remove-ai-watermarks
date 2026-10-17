@@ -31,22 +31,24 @@ request permission for each account or file already covered by the task.
 Submit each frozen artifact at most once per slot in that pass. Preserve
 inconclusive results and disagreements between accounts. Stop when the bounded
 plan is complete or no authorized usable slot remains; report remaining rows.
-New logins, another provider, a new network route, or another pass after the plan
-is exhausted require authorization unless already requested. Account
+New logins, another provider, or a new network route require authorization.
+The oracles and slots already configured for the requested provider may be used
+again, including their Web surfaces, without a second confirmation. Account
 continuation does not authorize changing candidate pixels or erasing failures.
 
 ## Default surface priority
 
 Prefer an official API adapter whenever that provider, media type, and configured
-slot support it. Use Web only when no usable API route exists or the operator
-explicitly requests the Web surface as a second check. For OpenAI and Microsoft,
-the default plans are API then Web. Google and Meta currently have only usable
-Web routes in this tooling. Inspect the order with `plan PROVIDER`.
+slot support it. For OpenAI and Microsoft, the default plans are API then Web.
+Google and Meta currently have only usable Web routes in this tooling. Google's
+routes are `gemini-web` and `synthid-web`. Inspect the order with `plan PROVIDER`.
+The same request may use every configured surface.
 
 The priority is a selection policy, not automatic failover. An API refusal,
 quota response, transport error, or indeterminate verdict must be recorded and
-reported. Do not submit the same artifact to Web unless the operator separately
-authorizes that next surface.
+reported. The same request already covers every configured surface of that
+provider, including Web. Run Web as its own acknowledged check and keep its
+verdict separate. Do not replace the API result with the Web result.
 
 ## Route by surface
 
@@ -85,6 +87,27 @@ If a planned Chrome profile or `/u/N/` account is not already authenticated,
 record that it is unavailable and continue with another authorized existing
 session. Ask the user only when no usable authorized session remains. Do not
 start a new login.
+
+### SynthID Detector
+
+Use the user's real authenticated Chrome. Do not use isolated Playwright: the
+portal's additional terms forbid using the page as an automated API, bulk
+verification, and quota evasion.
+
+1. Validate a `synthid-web` slot. It names `browser_profile` and `account_label`.
+   It does not use `google_account_index` or a proxy variable.
+2. Prepare an immutable batch outside the repository. Inspect images the same
+   way as for Gemini, and do not submit a file that still shows a provider logo.
+3. Open `https://synthid.com/` in the named Chrome profile. Accept the terms
+   dialog when it is shown. Do not start a new login. If the page requires
+   sign-in and that profile has no session, leave the row unsubmitted.
+4. Attach one prepared upload through the page's own file control.
+5. Read the settled label. `Watermark detected` is `detected`. `Watermark not
+   detected` is `not_detected`. Quota, sign-in, and unclear wording stay
+   `refused` or `indeterminate`.
+6. Record the verbatim response. The result covers partner SynthID from Google
+   DeepMind, Nvidia, OpenAI, and Kakao, and it does not name which partner. Do
+   not record it as a Gemini-only or OpenAI-only verdict.
 
 ### OpenAI, Microsoft, and Meta Web
 

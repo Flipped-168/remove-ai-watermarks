@@ -14,6 +14,7 @@ through the installed CLI or public Python API.
 | `openai-api` | OpenAI SynthID | Official Content Provenance API | Images |
 | `microsoft-api` | Microsoft InvisMark | Azure Content Provenance Detection API | Images |
 | `gemini-web` | Google SynthID | Signed-in Gemini web account | Images and videos |
+| `synthid-web` | Partner SynthID | SynthID Detector at synthid.com, real Chrome | None recorded |
 | `meta-web` | Meta Content Seal | Anonymous Meta identification page | Images |
 | `microsoft-web` | Microsoft InvisMark | Public Azure AI validation page | Images |
 | `openai-web` | OpenAI SynthID | Public web verifier | Images |
@@ -23,26 +24,46 @@ through the installed CLI or public Python API.
 The default selection order is API first, then Web. OpenAI therefore plans
 `openai-api` before `openai-web`, and Microsoft plans `microsoft-api` before
 `microsoft-web`. Google and Meta currently have no usable API adapter in this
-tooling, so their Web surfaces are primary rather than fallback routes.
+tooling, so each of their Web surfaces is primary. Google has two: `gemini-web`
+and `synthid-web`.
 
 Inspect the machine-readable order before preparing a batch:
 
 ```bash
 uv run python scripts/provider_oracles.py plan openai --json
 uv run python scripts/provider_oracles.py plan microsoft
+uv run python scripts/provider_oracles.py plan google
 ```
 
-API-first is a selection policy, not automatic failover. Use Web only when the
-provider, requested media, or local configuration has no usable API route, or
-when the operator explicitly requests a second surface. An API refusal, quota
-response, transport failure, or indeterminate verdict is recorded as-is and
-never silently triggers a Web upload.
+A request to use a provider covers every configured surface of that provider,
+including Web, without a second confirmation. API-first is still the order to
+try, not a lock on the other surfaces. An API refusal, quota response, transport
+failure, or indeterminate verdict is recorded as-is. It does not silently
+upload the same file to Web; run that surface as its own acknowledged check and
+keep the two verdicts separate.
 
-The old Google SynthID Detector portal does not work. On 2026-09-07, the
-official `labs.google/synthid` entry point redirected a signed-in browser to a
-Google 404; on 2026-09-23 it redirected to
-`deepmind.google.com/frontiers/synthid`, which also returned 404. Historical corpus rows may still name `synthid-portal`; that value
-describes how an old result was obtained and is not an operational surface.
+The old Google SynthID Detector portal at `labs.google/synthid` does not work.
+On 2026-09-07 that entry point redirected a signed-in browser to a Google 404;
+on 2026-09-23 it redirected to `deepmind.google.com/frontiers/synthid`, which
+also returned 404. Historical corpus rows may still name `synthid-portal`; that
+value describes how an old result was obtained and is not an operational surface.
+
+The public SynthID Detector is a different site, [synthid.com](https://synthid.com/),
+and it is the `synthid-web` surface. On 2026-10-17 the page title was
+`SynthID Detector`. After the terms dialog, the uploader was present without a
+completed sign-in in that session. The Account menu still offered Sign in, and
+no file was submitted, so this check does not show whether a result requires an
+account. The live FAQ named the partners as Google DeepMind, Nvidia, OpenAI,
+and Kakao, and it did not list Apple. It defined two settled labels:
+`Watermark detected` and `Watermark not detected`. The file input accepted
+`.jpg`, `.jpeg`, `.png`, `.bmp`, `.webp`, `.avif`, `.heic`, `.heif`, `.tiff`,
+`.tif`, `.gif`, `.wav`, `.mp3`, `.ogg`, `.flac`, `.aac`, `.m4a`, `.mp4`,
+`.mov`, and `.webm`. This tooling still prepares only the project's existing
+JPEG, PNG, WebP, MP4, MP3, and WAV suffixes. The portal's additional terms
+forbid using the page as an automated API, bulk verification, and quota evasion,
+so `run-web` does not drive it. Use the real Chrome workflow below. A
+`Watermark detected` result is partner SynthID, not a Gemini-only or OpenAI-only
+verdict.
 Google's newer Search verification entry point did not provide an independent
 oracle allowance in the session tested on 2026-09-13. Lens accepted the
 metadata-stripped, previously Gemini-positive image
@@ -161,9 +182,12 @@ Adobe Inspect and local C2PA, DWT-DCT, TrustMark, and research detectors are
 useful evidence readers, not interchangeable provider pixel-watermark oracles.
 
 The surface capability and this project's evidence coverage are separate. The
-current Google, Microsoft, and Meta pages accept image, video, and audio inputs;
-the OpenAI API accepts image and audio. A media type does not become certified
-merely because a surface accepts it. Run `list --json` to read both fields.
+current Google, Microsoft, and Meta pages, including `https://synthid.com/`,
+accept image, video, and audio inputs; the OpenAI API accepts image and audio.
+A media type does not become certified merely because a surface accepts it.
+`synthid-web` therefore lists image, video, and audio as accepted media and
+records no project evidence until a batch is verified. Run `list --json` to read
+both fields.
 
 ## Execution slots
 
@@ -192,6 +216,13 @@ default; `--slots PATH` explicitly overrides it.
       "browser_profile": "Your Chrome",
       "google_account_index": 2,
       "network_label": "office"
+    },
+    {
+      "name": "synthid-personal",
+      "surface": "synthid-web",
+      "account_label": "google-account-a",
+      "browser_profile": "Your Chrome",
+      "network_label": "home"
     },
     {
       "name": "openai-web-thordata-us",
@@ -261,7 +292,9 @@ default; `--slots PATH` explicitly overrides it.
 ```
 
 A routed batch selects one slot explicitly. A Gemini slot must name the Google
-account, its real Chrome profile, and its nonnegative `/u/N/` account index; an
+account, its real Chrome profile, and its nonnegative `/u/N/` account index. A
+SynthID Detector slot names the account and the same real Chrome profile, and it
+does not use `google_account_index`. An
 API slot must name its account or project and cannot name a browser profile. The
 tool records the network route that the operator has already established.
 Non-Google Web slots may name `proxy_url_env`; Playwright reads the secret proxy
@@ -279,9 +312,10 @@ again for files or accounts already covered by the task.
 Submit each frozen artifact at most once per slot in that pass. Keep every
 verbatim refusal, inconclusive reply, and disagreement between accounts. Stop
 when the planned checks finish or no authorized usable slot remains, and report
-unsubmitted rows. A new login, another provider, a new network route, or a new
-pass after the bounded plan is exhausted needs authorization unless already
-requested. Candidate pixels remain frozen throughout account continuation.
+unsubmitted rows. A new login, another provider, or a new network route needs
+authorization. The oracles and slots already configured for the requested
+provider may be used again, including their Web surfaces, without a second
+confirmation. Candidate pixels remain frozen throughout account continuation.
 
 Each `openai-api` slot must name exactly one `api_key_env`. Put the corresponding
 values in the gitignored local `.env`, never in the slot JSON:
@@ -385,18 +419,23 @@ uv sync --extra dev
 uv run playwright install chromium
 ```
 
-Google is intentionally excluded from the standalone runner because its oracle
-requires the user's existing authenticated Chrome session. Invoke the project
-`provider-oracles` skill to prepare the batch, select the named real Chrome
-profile and `/u/N/` Google account, upload each prepared artifact, capture the
-settled SynthID tool outcome, and record it.
+Google is intentionally excluded from the standalone runner. Both `gemini-web`
+and `synthid-web` use the user's existing real Chrome profile, and the SynthID
+Detector terms forbid driving that page as an automated API. Invoke the project
+`provider-oracles` skill to prepare the batch and record the settled outcome.
+For Gemini, select the named profile and `/u/N/` account. For SynthID Detector,
+open `https://synthid.com/` in that profile. The portal has no `/u/N/` index.
+Accept the terms dialog when it is shown, attach one prepared upload, and read
+the explicit `Watermark detected` or `Watermark not detected` label. If the page
+requires sign-in and that profile has no session, record the row unsubmitted
+and do not start a new login.
 
-Ask the direct question stored in the batch manifest: `Does this
+For Gemini, ask the direct question stored in the batch manifest: `Does this
 image/video/audio contain a SynthID watermark? Use the SynthID verification
 tool only; do not infer from visible content, logos, text, or metadata.` A
 general question about whether Google AI created or edited the media is not
 equivalent: it may elicit origin or visual-content reasoning without a SynthID
-verdict.
+verdict. SynthID Detector has no prompt; its settled labels are the verdict.
 
 OpenAI Web, Microsoft Web, and Meta run entirely through a fresh isolated
 Playwright browser. A direct-route example:

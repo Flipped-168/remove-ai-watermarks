@@ -23,6 +23,7 @@ def test_catalog_covers_every_project_vendor_oracle_surface() -> None:
         "microsoft-web",
         "openai-api",
         "openai-web",
+        "synthid-web",
     }
     assert {"google", "meta", "microsoft", "openai"} == oracles.PROVIDER_KEYS
     assert oracles.SURFACES["openai-api"].automation == "api"
@@ -34,6 +35,14 @@ def test_catalog_covers_every_project_vendor_oracle_surface() -> None:
         "Does this image/video/audio contain a SynthID watermark? Use the SynthID verification tool only; "
         "do not infer from visible content, logos, text, or metadata."
     )
+    synthid = oracles.SURFACES["synthid-web"]
+    assert synthid.automation == "real_browser"
+    assert synthid.provider_key == "google"
+    assert synthid.url == "https://synthid.com/"
+    assert synthid.media_types == ("image", "video", "audio")
+    assert synthid.project_evidence == ()
+    assert synthid.prompt is None
+    assert "Google DeepMind, Nvidia, OpenAI, and Kakao" in synthid.clean_result_note
 
 
 def test_default_slot_config_is_repository_local() -> None:
@@ -52,6 +61,7 @@ def test_list_json_exposes_scope_and_surface() -> None:
         "meta-web",
         "microsoft-web",
         "openai-web",
+        "synthid-web",
     ]
     assert next(row for row in payload if row["key"] == "meta-web")["signal_family"] == "content_seal"
 
@@ -59,7 +69,7 @@ def test_list_json_exposes_scope_and_surface() -> None:
 @pytest.mark.parametrize(
     ("provider", "expected"),
     [
-        ("google", ["gemini-web"]),
+        ("google", ["gemini-web", "synthid-web"]),
         ("meta", ["meta-web"]),
         ("microsoft", ["microsoft-api", "microsoft-web"]),
         ("openai", ["openai-api", "openai-web"]),
@@ -67,6 +77,17 @@ def test_list_json_exposes_scope_and_surface() -> None:
 )
 def test_provider_plan_prefers_api_before_web(provider: str, expected: list[str]) -> None:
     assert [surface.key for surface in oracles.provider_plan(provider)] == expected
+
+
+def test_plan_json_keeps_every_google_web_surface_primary() -> None:
+    result = CliRunner().invoke(oracles.cli, ["plan", "google", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert [(row["key"], row["preference"]) for row in payload] == [
+        ("gemini-web", "primary"),
+        ("synthid-web", "primary"),
+    ]
 
 
 def test_plan_json_marks_web_as_an_explicit_fallback_when_api_exists() -> None:
@@ -255,11 +276,32 @@ def test_slots_override_requires_a_named_slot(tmp_path: Path) -> None:
             },
             "only openai-api uses api_key_env",
         ),
+        (
+            {
+                "name": "synthid-no-profile",
+                "surface": "synthid-web",
+                "account_label": "personal-a",
+                "browser_profile": None,
+                "network_label": "home",
+            },
+            "requires a browser_profile",
+        ),
+        (
+            {
+                "name": "synthid-with-account-index",
+                "surface": "synthid-web",
+                "account_label": "personal-a",
+                "browser_profile": "Profile 2",
+                "google_account_index": 0,
+                "network_label": "home",
+            },
+            "only gemini-web uses google_account_index",
+        ),
     ],
 )
 def test_slots_require_the_identity_needed_by_the_surface(
     tmp_path: Path,
-    slot: dict[str, str | None],
+    slot: dict[str, str | int | None],
     message: str,
 ) -> None:
     config = tmp_path / "slots.json"
