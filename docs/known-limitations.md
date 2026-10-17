@@ -4,6 +4,21 @@ This page describes current product limits. Historical measurements and
 superseded experiments live in the research archive listed in
 [the documentation index](index.md).
 
+## What each path leaves behind
+
+No command produces a "clean" verdict. Each one removes a specific layer, and
+the remaining layers need their own check.
+
+| Path | Removes | May remain | How to check what remains |
+| --- | --- | --- | --- |
+| `metadata --remove`, `video metadata --remove` | Supported AI metadata: C2PA manifests, TC260 labels, IPTC AI fields, app-export JSON, generation parameters | Every pixel and audio watermark (SynthID, Meta Content Seal, InvisMark, TrustMark, DWT-DCT). A C2PA soft binding can still lead a resolver to a manifest stored remotely. Strings inside encoded video streams, such as H.264 SEI messages, stay too, except Kling's SEI tag, which `video metadata --remove` blanks | `identify` re-reads the metadata. Only the provider's verifier can confirm a pixel watermark. The pixels are not regenerated, so an AI-image classifier scores the output the same as the input |
+| `visible`, `erase`, `video visible` | The selected label region, refilled. AI metadata too, unless `--keep-metadata` is given | Any invisible watermark across the rest of the frame. The fill can leave a visible patch on structured backgrounds | Look at the output. Use `identify` for metadata and the provider's verifier for invisible marks |
+| `invisible`, `all`, `video invisible` | Regenerates pixels to disrupt invisible watermarks. `all` also removes visible marks and metadata | No local decoder confirms that SynthID is gone from a given file, and the outcome depends on content and seed. `video invisible` copies the audio track unchanged, so an audio watermark survives | The provider's verifier, such as Google's SynthID Detector or OpenAI's provenance check. A pass there says nothing about AI-image classifiers |
+| `identify`, `video identify` | Nothing | Not applicable | `unknown` means no supported local signal was found. It is not a clean verdict |
+
+AI-image classifiers are a separate question from provenance. They score how
+the pixels look rather than read a mark, and none of these paths targets them.
+
 ## Pixel classification
 
 `classify` / `classify_pixels` is AI versus camera, not a universal AI detector.
@@ -263,7 +278,9 @@ guarantee, and check the audio separately when it matters. The question is no
 longer Google-only: since 2026 OpenAI (ChatGPT and API audio) and ElevenLabs
 also embed SynthID in generated audio, and Microsoft lists provenance for its
 Azure speech and GPT audio models, so voice-over or music from those services
-muxed into any video survives this path unchanged.
+muxed into any video survives this path unchanged. Suno announced audio
+watermarking and fingerprinting on 2026-08-06 without naming the technology, so
+Suno music belongs on the same list.
 
 The public video results make that boundary explicit without decoding audio:
 `visual_invisible_action` records whether video pixels were regenerated, while

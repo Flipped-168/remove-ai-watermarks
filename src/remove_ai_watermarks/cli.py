@@ -915,6 +915,11 @@ def cmd_invisible(
     source = _validate_image(source)
     if output is None:
         output = source.with_stem(source.stem + "_clean")
+    # The scrub gate reads an undecodable file as "no target", which would exit 2
+    # (nothing to remove) for a file this command never looked at.
+    if image_io.imread(source) is None:
+        console.print(f"Error: Failed to read image: {source}")
+        raise SystemExit(1)
 
     # An explicit --vendor wins over detection (see the option help) and implies the
     # scrub runs: naming the cohort asserts the pixel watermark is present, so the

@@ -47,6 +47,9 @@ Important contracts:
   `EXIT_NO_VISIBLE_MARK`.
 - `invisible` writes no output when no supported local signal is found, unless
   `--force` is supplied.
+  It decodes the source before the scrub gate and exits `1` when it cannot,
+  because the gate reads undecodable bytes as "no target" and would otherwise
+  report the no-signal code for a file it never read (fixed 2026-10-17).
 - The two no-signal conditions currently share exit code `2`.
 - A quiet `metadata --check` and a successful `metadata --remove` (same for
   `video metadata`) end by repeating the `identify` limit: the pixel channel is
@@ -236,9 +239,45 @@ payloads; TC260 removal changes the four-byte key to `free` and blanks only the
 validated JSON value with same-length spaces. Keyed generation metadata such
 as `workflow` and `prompt` uses the same structural walk; removal blanks the
 complete key and value in place. This preserves every box size,
-`stco`/`co64` offset, encoded stream byte, and source-sized memory bound.
+`stco`/`co64` offset, encoded stream byte apart from the Kling SEI tag below, and
+source-sized memory bound.
 Publication is atomic, and a malformed top-level walk is copied unchanged. A
 generic `AIGC` key whose value has no TC260 field is ignored.
+
+App-export JSON in a keyed or keyless metadata item is blanked the same way.
+Dreamina's MP4 export writes it twice, under `LvMetaInfo` and
+`com.apple.quicktime.artwork`. The file-level scan read both from the raw head
+bytes while the stripper walked only TC260 and generation keys, so
+`video metadata --remove` exited 1 with both markers still present on the
+tracked Dreamina fixture (found 2026-10-17). Its `UserComment`
+(`{"aigc_label_type":0,"source_info":"dreamina"}`) and `comment` (`vid:...`)
+items carry no marker the scan counts, so they stay.
+
+`test_no_flagged_metadata_value_survives_in_the_output_bytes` strips every
+tracked MP4 fixture and searches the output byte for byte for each flagged
+source value, after the pattern of byte-level leftover checks in public video
+scrubbers. The walk reaches container metadata only. Strings inside the encoded
+streams are out of its reach with one exception: x264 writes its version and
+options as an H.264 SEI message, which is not AI provenance and survives the
+stream copy; only a path that re-encodes the video stream (`video visible`,
+`video invisible`) replaces it.
+
+The exception is Kling's encoder tag. Every Kling video in the tracked fixtures
+and local captures (Kling 2.6, 3.0, 3.0 Omni and O3, through Higgsfield, Runway
+and Kling itself) carries one H.264 `user_data_unregistered` SEI message, payload
+type 5, whose 25-byte payload is UUID `91ca6061-4aee-3854-8614-2d5f73f4ae2e`,
+`kling-ai` and a NUL. `get_ai_metadata` reports it as `kling_sei` from the head
+window, and `identify_video` names Kling from it when no TC260 label does, as on
+`data/fixtures/visible/kling/provider-original.mp4`, which carries no other
+signal. The streaming stripper finds every copy of the UUID plus `kling-ai` in
+each top-level `mdat` during the copy pass it already makes, so the file is still
+read once, and overwrites those 24 bytes with spaces. The NAL length,
+SEI header and payload size stay, and a run of 0x20 cannot form an
+emulation-prevention sequence, so the message stays well-formed and no decoder
+reads it: `ffmpeg -f framemd5` hashes of every frame match before and after on
+both tracked Kling fixtures (found and fixed 2026-10-17). The QuickTime `©cmt` item in
+the Grok fixture (`Signature: <base64>`) also survives, because the xAI
+signature rule requires the UUID half of the pair and that half is absent here.
 
 [`_internal/ebml.py`](../src/remove_ai_watermarks/_internal/ebml.py) provides the
 corresponding bounded Matroska/WebM reader. It seeks over clusters and accepts
@@ -1504,6 +1543,15 @@ schemas 0-2 count as positives. Schema 3 is below the precision threshold: all
 38 measured historical false-positive candidates used it, and six retained the
 same false payload after re-encoding. The official Adobe Variant P schema-1
 fixture in `data/fixtures/provenance/` is the positive regression control.
+
+An independent benchmark supports gating beyond a valid codeword. Kazempourradi
+et al. ([arXiv:2610.04151](https://arxiv.org/abs/2610.04151), section 4.4)
+found that the blind detectors of TrustMark B, C, P and Q in BCH_5 mode reported
+a valid codeword on at least one of four decodes for 5.9% (P) to 15.3% (C) of 85
+unmarked images, and on 3 of 8 images in a 16-bit HDR subset. Testing the same
+decodes against the expected payload produced no false match. This detector is
+blind and has no expected payload, so the re-encode stability and schema
+restriction above stand in for that test.
 
 #### Why the DWT-DCT decoder looks the way it does
 

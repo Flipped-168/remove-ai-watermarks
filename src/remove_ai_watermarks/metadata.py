@@ -85,6 +85,11 @@ AI_KEYWORDS: tuple[str, ...] = (
 # Reference: https://spec.c2pa.org/specifications/specifications/2.1/specs/C2PA_Specification.html
 C2PA_UUID: bytes = bytes.fromhex("d8fec3d61b0e483c92975828877ec481")
 
+# Kling's encoder writes an H.264 ``user_data_unregistered`` SEI message (payload
+# type 5) whose payload is this UUID followed by ``kling-ai``. It lives in the coded
+# stream inside ``mdat``, where no metadata box walk reaches it.
+KLING_SEI_TAG: bytes = bytes.fromhex("91ca60614aee385486142d5f73f4ae2e") + b"kling-ai"
+
 
 def c2pa_marker_in(data: bytes) -> bool:
     """True if ``data`` carries a real C2PA manifest marker, not just an
@@ -1429,6 +1434,10 @@ def get_ai_metadata(image_path: Path) -> dict[str, str]:
         result.setdefault("app_provenance", f"App export provenance ({app_provenance})")
     if app_generator:
         result.setdefault("app_aigc", f"App AIGC disclosure ({app_generator})")
+
+    # Kling's encoder tag, an H.264 SEI message in the first video sample.
+    if KLING_SEI_TAG in app_scan:
+        result.setdefault("kling_sei", "Kling AI encoder tag (H.264 SEI kling-ai)")
 
     # xAI / Grok signature pair in EXIF or an equivalent container-native field.
     if xai_signature(image_path):

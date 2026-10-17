@@ -95,6 +95,8 @@ The inspection and stripping code handles signals in these groups:
 - exact app-export provenance and AIGC disclosures from supported
   ByteDance-family products, with product-only provenance excluded from the
   generated-image verdict;
+- Kling's H.264 `user_data_unregistered` SEI tag (`kling-ai`) in MP4/MOV
+  video, blanked in place by `video metadata --remove` without re-encoding;
 - IPTC AI disclosure fields;
 - PNG text chunks and embedded generation parameters, including keyed
   `workflow` and `prompt` tags in MP4/MOV metadata lists;
@@ -300,7 +302,7 @@ not a universal clean verdict.
 | Luma AI | None registered | No registered pixel decoder | PNG text generator tags (Uni-1) |
 | ByteDance generators | Doubao and Jimeng marks | No registered pixel decoder | TC260 AIGC, supported C2PA, and exact app-export AIGC disclosures |
 | Qwen | Qwen mark | No registered pixel decoder | TC260 AIGC |
-| Kling AI | Kling AI image and video marks | No registered pixel decoder | TC260 AIGC |
+| Kling AI | Kling AI image and video marks | No registered pixel decoder | TC260 AIGC and the video SEI tag |
 | Vidu (ShengShu) | Vidu video mark | No registered pixel decoder | TC260 AIGC in the MP4 `AIGC` key |
 | Runway | None measured on paid-plan output | No registered pixel decoder | C2PA signed `RUNWAY AI, INC.` on its own models; third-party models keep their vendor's manifest |
 | Amazon Bedrock (Nova Canvas, Nova Reel) | None | Invisible watermark readable only through the Bedrock API | C2PA signed `Amazon Web Services, Inc.`, claim generator `Amazon Bedrock` |

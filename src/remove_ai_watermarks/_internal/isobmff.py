@@ -7,7 +7,9 @@ without re-encoding, the image path drops matching boxes and emits the rest
 verbatim. The streaming MP4/MOV/M4A path instead preserves all offsets by
 retyping matching boxes as ``free`` and blanking their payloads in place. The
 codestream (``mdat`` for ISOBMFF, ``jxlc`` / ``jxlp`` for JPEG-XL) is untouched,
-so pixel, video, and audio data is preserved bit-for-bit.
+so pixel, video, and audio data is preserved bit-for-bit. The one exception is
+Kling's SEI tag inside ``mdat``: its bytes are blanked in place, which no decoder
+reads, so every decoded frame stays identical.
 
 TC260-PG-20257A video metadata is nested instead:
 ``moov.udta.meta.keys/ilst``. Its detector seeks through those boxes without
@@ -43,8 +45,11 @@ from remove_ai_watermarks.metadata import (
     C2PA_UUID,
     IPTC_AI_FIELD_MARKERS,
     IPTC_AI_MARKERS,
+    KLING_SEI_TAG,
     LOCAL_GENERATION_METADATA_KEYS,
     MAX_TC260_VALUE_BYTES,
+    app_generator_from_metadata,
+    app_provenance_from_metadata,
     parse_tc260_aigc_json,
 )
 
@@ -347,6 +352,55 @@ def _ai_metadata_regions(
     return regions
 
 
+def _app_metadata_regions(
+    stream: BinaryIO,
+    file_size: int,
+) -> list[tuple[tuple[int, int] | None, int, int]]:
+    """Locate keyed or keyless values carrying an app-export provenance object.
+
+    Dreamina writes its export JSON under ordinary keys (``LvMetaInfo`` and a
+    second copy under ``com.apple.quicktime.artwork``). The file-level scan reads
+    it from the raw head bytes, so removal must blank every item it would match.
+    """
+    return [
+        (key_span, value_start, value_end)
+        for _name, key_span, value_start, value_end, value in _metadata_items(stream, file_size)
+        if app_provenance_from_metadata(value) or app_generator_from_metadata(value)
+    ]
+
+
+def _copy_finding_kling_sei(
+    source: BinaryIO,
+    target: BinaryIO,
+    mdat_ranges: list[tuple[int, int]],
+) -> list[int]:
+    """Copy ``source`` to ``target`` and return each Kling SEI tag offset in ``mdat``.
+
+    Detection reads the tag from the head window, but removal covers every copy in
+    the media data. The search rides on the copy, so the file is read once. Each
+    window carries one byte less than the tag from the previous chunk, so a copy
+    straddling a read boundary is found exactly once.
+    """
+    keep = len(KLING_SEI_TAG) - 1
+    offsets: list[int] = []
+    tail = b""
+    pos = 0
+    while chunk := source.read(_STREAM_COPY_BYTES):
+        target.write(chunk)
+        if mdat_ranges:
+            window = tail + chunk
+            base = pos - len(tail)
+            found = window.find(KLING_SEI_TAG)
+            while found != -1:
+                start = base + found
+                if any(low <= start and start + len(KLING_SEI_TAG) <= high for low, high in mdat_ranges):
+                    offsets.append(start)
+                found = window.find(KLING_SEI_TAG, found + 1)
+            tail = window[-keep:]
+        pos += len(chunk)
+    return offsets
+
+
 def ai_metadata_tags(path: str | Path, *, strict: bool = False) -> dict[str, str]:
     """Read keyed AI-generation metadata from an ISOBMFF container."""
     try:
@@ -601,15 +655,16 @@ def strip_isobmff_media_file(
 
     The output retains every box size and byte offset. A top-level C2PA/JUMBF or
     AI-label box is converted to a ``free`` box and its payload is zeroed; native
-    TC260 key/value spans are blanked in place. Keeping the original lengths is
-    required because removing a pre-``mdat`` box would invalidate absolute media
-    offsets in an existing sample table.
+    TC260, generation-key and app-export key/value spans, and the Kling SEI tag in
+    ``mdat``, are blanked in place. Keeping the original lengths is required
+    because removing a pre-``mdat`` box would invalidate absolute media offsets in
+    an existing sample table.
 
     The source is copied in bounded chunks to a sibling temporary file and
     atomically published only after all patches succeed. A malformed top-level
     walk is fail-safe: the input is copied unchanged.
 
-    Returns ``(provenance_boxes_blanked, native_tc260_keys_blanked)``.
+    Returns ``(provenance_boxes_blanked, native_tags_blanked)``.
     """
     from pathlib import Path as _Path
 
@@ -627,12 +682,23 @@ def strip_isobmff_media_file(
         )
         tc260_regions = _tc260_aigc_regions(stream, file_size) if targets is not None else []
         ai_metadata_regions = _ai_metadata_regions(stream, file_size) if targets is not None else []
+        app_regions = _app_metadata_regions(stream, file_size) if targets is not None else []
+        mdat_ranges = (
+            [
+                (payload, end)
+                for _start, end, box_type, payload in iter_file_boxes(stream, 0, file_size)
+                if box_type == b"mdat"
+            ]
+            if targets is not None
+            else []
+        )
         tc260_key_spans = {region[0] for region in tc260_regions if region[0] is not None}
         ai_metadata_key_spans = {region[0] for region in ai_metadata_regions}
+        app_key_spans = {region[0] for region in app_regions if region[0] is not None}
 
     with atomic_video_output(output_path) as temporary_path:
         with source_path.open("rb") as source_stream, temporary_path.open("r+b") as temporary:
-            shutil.copyfileobj(source_stream, temporary, length=_STREAM_COPY_BYTES)
+            kling_sei_offsets = _copy_finding_kling_sei(source_stream, temporary, mdat_ranges)
             if targets is not None:
                 for box_start, payload_start, box_end in targets:
                     temporary.seek(box_start + 4)
@@ -647,6 +713,15 @@ def strip_isobmff_media_file(
                     temporary.seek(key_span[0])
                     temporary.write(b"free" + b" " * (key_span[1] - key_span[0] - 4))
                     _overwrite_range(temporary, value_start, value_end, byte=b" ")
+                for key_span, value_start, value_end in app_regions:
+                    if key_span is not None:
+                        temporary.seek(key_span[0])
+                        temporary.write(b"free" + b" " * (key_span[1] - key_span[0] - 4))
+                    _overwrite_range(temporary, value_start, value_end, byte=b" ")
+                # Spaces keep the SEI message well-formed: its length fields stand,
+                # and a 0x20 run cannot form an emulation-prevention sequence.
+                for offset in kling_sei_offsets:
+                    _overwrite_range(temporary, offset, offset + len(KLING_SEI_TAG), byte=b" ")
             temporary.flush()
             os.fsync(temporary.fileno())
         shutil.copymode(source_path, temporary_path)
@@ -657,7 +732,8 @@ def strip_isobmff_media_file(
             source_path,
         )
         return 0, 0
-    return len(targets), len(tc260_key_spans | ai_metadata_key_spans)
+    # Every copy of the Kling tag is one tag, however many samples repeat it.
+    return len(targets), len(tc260_key_spans | ai_metadata_key_spans | app_key_spans) + bool(kling_sei_offsets)
 
 
 def strip_c2pa_boxes(data: bytes) -> tuple[bytes, int]:

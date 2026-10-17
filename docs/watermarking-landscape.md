@@ -37,6 +37,12 @@ claim generator still falls back to the certificate issuer.
 Exact claim-generator mappings also cover `Grok Imagine` as xAI Grok Imagine
 and `Suno` as Suno. Both can carry a valid AI source claim without a separately
 readable issuer, so issuer-only attribution leaves the platform blank.
+Suno also [announced on 2026-08-06](https://suno.com/blog/building-the-future-of-music-responsibly)
+that it would adopt "new audio watermarking and fingerprinting technology" in
+the coming weeks. It did not name the technology
+([TechCrunch](https://techcrunch.com/2026/08/06/amid-legal-battles-suno-says-it-will-start-watermarking-songs/)
+asked whether it would be SynthID and got no answer), so there is no local
+detector, and metadata stripping leaves any such mark in the audio.
 
 Some signers expose the product in `signature_info` while retaining a generic
 claim generator. xAI Grok Imagine is recognized from that signed identity even

@@ -490,6 +490,8 @@ invisible removal.
 
 - A missing local signal means unknown, not clean. Proprietary pixel
   watermarks may remain after metadata has been stripped.
+  [What each path leaves behind](docs/known-limitations.md#what-each-path-leaves-behind)
+  lists, per command, what may remain and how to check it.
 - Visible removal reconstructs a small region. Results depend on the background
   and selected fill backend.
 - Invisible removal changes the whole image and may alter faces, text, or fine

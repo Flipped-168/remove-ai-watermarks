@@ -1326,3 +1326,29 @@ def test_unreadable_input_exits_cleanly(runner, tmp_path, name, content, cmd):
     else:
         assert result.exit_code == 1, result.output  # cannot remove a mark from unreadable input
         assert "Error" in result.output
+
+
+@pytest.mark.parametrize(
+    ("name", "content"),
+    [
+        ("empty.png", b""),
+        ("notimage.jpg", b"plain text, not an image at all " * 20),
+        ("truncated.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 40),
+    ],
+)
+@pytest.mark.parametrize("force", [[], ["--force"]])
+def test_invisible_rejects_unreadable_input_instead_of_reporting_no_signal(runner, tmp_path, name, content, force):
+    """The scrub gate reads undecodable bytes as "no target", so without a decode
+    check `invisible` exited 2 -- the no-signal code -- on a file it never read,
+    while `all` and `batch` exited 1."""
+    bad = tmp_path / name
+    bad.write_bytes(content)
+    mock_cls, mock_engine = _mock_invisible_engine()
+    with (
+        patch("remove_ai_watermarks.invisible_engine.InvisibleEngine", mock_cls),
+        patch("remove_ai_watermarks.invisible_engine.is_available", return_value=True),
+    ):
+        result = runner.invoke(main, ["invisible", str(bad), "-o", str(tmp_path / "out.png"), *force])
+    assert result.exit_code == 1, result.output
+    assert "Failed to read image" in result.output
+    mock_engine.remove_watermark.assert_not_called()

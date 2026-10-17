@@ -151,7 +151,7 @@ discarding the measured results.
   now exists, but its 2026-08-08 README is still a release placeholder: the
   authors say they will publish code after their SynthID testing and Google
   Security Bounty submission. There is no implementation to evaluate as of
-  2026-10-01 (arXiv:2601.08832).
+  2026-10-17, when the repository still held only that README (arXiv:2601.08832).
   MiniMax-Remover (CC-BY-NC-4.0 weights) and ProPainter (S-Lab License,
   non-commercial) are deliberately excluded on license and are not backlog
   items.

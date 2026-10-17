@@ -377,6 +377,8 @@ def _platform_from_video_metadata(markers: dict[str, str]) -> str | None:
         return _tc260_video_platform(markers.get("aigc_producer", "")) or (
             "China AIGC-labeled content (TC260 standard)"
         )
+    if "kling_sei" in markers:
+        return _tc260_video_platform("kling")
     return None
 
 

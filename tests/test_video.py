@@ -17,12 +17,13 @@ from click.testing import CliRunner
 from PIL import Image, ImageDraw, ImageFont
 
 from remove_ai_watermarks.cli import main
-from remove_ai_watermarks.metadata import C2PA_UUID
+from remove_ai_watermarks.metadata import C2PA_UUID, KLING_SEI_TAG
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
 
+_PROVENANCE_FIXTURES = Path(__file__).resolve().parents[1] / "data/fixtures/provenance"
 _MP4_FTYP = b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom"
 _VIDEO_PAYLOAD = b"synthetic-video-payload"
 _TC260_AIGC = (
@@ -34,6 +35,17 @@ _TC260_AIGC = (
 
 def _box(box_type: bytes, payload: bytes) -> bytes:
     return (8 + len(payload)).to_bytes(4, "big") + box_type + payload
+
+
+# The H.264 NAL exactly as Kling writes it into the first sample: a 4-byte length,
+# an SEI header, payload type 5 (user_data_unregistered) of 25 bytes, the tag, a
+# NUL and the RBSP trailing bits.
+_KLING_SEI_NAL = b"\x00\x00\x00\x1d\x06\x05\x19" + KLING_SEI_TAG + b"\x00\x80"
+
+
+def _video_with_kling_sei(path: Path) -> Path:
+    path.write_bytes(_MP4_FTYP + _box(b"mdat", _KLING_SEI_NAL + _VIDEO_PAYLOAD) + _box(b"moov", b""))
+    return path
 
 
 def _video_with_c2pa(path: Path) -> Path:
@@ -644,6 +656,108 @@ class TestVideoMetadataApi:
         assert _VIDEO_PAYLOAD in output.read_bytes()
         assert C2PA_UUID not in output.read_bytes()
 
+    @pytest.mark.parametrize(
+        "name",
+        sorted(path.name for path in _PROVENANCE_FIXTURES.glob("*.mp4")),
+    )
+    def test_no_flagged_metadata_value_survives_in_the_output_bytes(self, tmp_path: Path, name: str):
+        # The re-scan reads only the head window it was built for. Each flagged value
+        # is also searched for byte for byte, so an untouched copy the re-scan does not
+        # reach cannot survive while `remaining` reports clean.
+        from remove_ai_watermarks._internal.isobmff import _metadata_items
+        from remove_ai_watermarks.metadata import (
+            app_generator_from_metadata,
+            app_provenance_from_metadata,
+            parse_tc260_aigc_json,
+        )
+        from remove_ai_watermarks.video import remove_video_metadata
+
+        source = _PROVENANCE_FIXTURES / name
+        data = source.read_bytes()
+        flagged = [
+            value
+            for _key, _span, _start, _end, value in _metadata_items(io.BytesIO(data), len(data))
+            if app_provenance_from_metadata(value)
+            or app_generator_from_metadata(value)
+            or parse_tc260_aigc_json(value) is not None
+        ]
+
+        result = remove_video_metadata(source, tmp_path / name)
+
+        assert bool(flagged) == bool({"aigc_label", "app_provenance"} & set(result.detected))
+        assert (KLING_SEI_TAG in data) == ("kling_sei" in result.detected)
+        assert result.remaining == {}
+        cleaned = result.output.read_bytes()
+        assert len(cleaned) == len(data)
+        assert C2PA_UUID not in cleaned
+        assert KLING_SEI_TAG not in cleaned
+        assert [value for value in flagged if value in cleaned] == []
+
+    def test_kling_sei_tag_alone_identifies_kling_and_is_blanked_in_place(self, tmp_path: Path):
+        from remove_ai_watermarks.video import identify_video, inspect_video_metadata, remove_video_metadata
+
+        source = _video_with_kling_sei(tmp_path / "source.mp4")
+
+        assert "kling_sei" in inspect_video_metadata(source).markers
+        report = identify_video(source, check_visible=False)
+        assert report.is_ai_generated is True
+        assert report.platform == "Kuaishou Kling AI"
+
+        result = remove_video_metadata(source, tmp_path / "clean.mp4")
+        cleaned = result.output.read_bytes()
+
+        assert result.remaining == {}
+        assert len(cleaned) == source.stat().st_size
+        assert KLING_SEI_TAG not in cleaned
+        # Only the tag bytes change: the NAL length, the SEI header and payload size,
+        # the trailing bits and the coded payload keep the stream parseable.
+        assert _KLING_SEI_NAL.replace(KLING_SEI_TAG, b" " * len(KLING_SEI_TAG)) + _VIDEO_PAYLOAD in cleaned
+
+    def test_kling_sei_tag_is_blanked_past_the_scan_window_and_across_read_chunks(self, tmp_path: Path):
+        from remove_ai_watermarks._internal.isobmff import _STREAM_COPY_BYTES
+        from remove_ai_watermarks.video import remove_video_metadata
+
+        # The first copy straddles the copy loop's first read boundary; the second
+        # sits past it and past the 1 MiB detection window.
+        header = len(_MP4_FTYP) + 8
+        lead = _STREAM_COPY_BYTES - header - len(_KLING_SEI_NAL) // 2
+        payload = b"\x11" * lead + _KLING_SEI_NAL + b"\x11" * 1024 + _KLING_SEI_NAL + _VIDEO_PAYLOAD
+        source = tmp_path / "source.mp4"
+        source.write_bytes(_MP4_FTYP + _box(b"mdat", payload) + _box(b"moov", b""))
+        tag_offset = source.read_bytes().index(KLING_SEI_TAG)
+        assert tag_offset < _STREAM_COPY_BYTES < tag_offset + len(KLING_SEI_TAG)
+
+        result = remove_video_metadata(source, tmp_path / "clean.mp4")
+        cleaned = result.output.read_bytes()
+
+        assert len(cleaned) == source.stat().st_size
+        assert cleaned.count(b" " * len(KLING_SEI_TAG)) == 2
+        assert KLING_SEI_TAG not in cleaned
+
+    @pytest.mark.parametrize("name", ["higgsfield-kling-3-0-turbo.mp4", "higgsfield-cinema-studio-v2.mp4"])
+    def test_blanking_the_kling_sei_tag_leaves_every_decoded_frame_unchanged(self, tmp_path: Path, name: str):
+        from remove_ai_watermarks.video import remove_video_metadata
+
+        ffmpeg, _ffprobe = _ffmpeg_test_tools()
+        source = _PROVENANCE_FIXTURES / name
+        assert KLING_SEI_TAG in source.read_bytes()
+
+        result = remove_video_metadata(source, tmp_path / name)
+
+        def frame_hashes(path: Path) -> list[str]:
+            completed = subprocess.run(  # noqa: S603
+                [ffmpeg, "-v", "error", "-xerror", "-i", str(path), "-map", "0:v:0", "-f", "framemd5", "-"],
+                check=True,
+                capture_output=True,
+            )
+            assert completed.stderr == b""
+            return [line for line in completed.stdout.decode().splitlines() if not line.startswith("#")]
+
+        assert KLING_SEI_TAG not in result.output.read_bytes()
+        before = frame_hashes(source)
+        assert before
+        assert frame_hashes(result.output) == before
+
     def test_default_output_preserves_source(self, tmp_path: Path):
         from remove_ai_watermarks.video import remove_video_metadata
 
@@ -720,13 +834,15 @@ class TestVideoMetadataApi:
         cleaned = output.read_bytes()
 
         assert result.detected["aigc_label"].startswith("China AIGC label")
-        # The artwork item's Doubao product JSON is app-export provenance, a
-        # separate signal the TC260 blanker does not touch -- as on the real
-        # Doubao iOS export this fixture mirrors.
-        assert result.remaining == {"app_provenance": "App export provenance (ByteDance Doubao)"}
+        # The artwork item's Doubao product JSON is app-export provenance, which
+        # the stripper blanks beside the TC260 label, as on the real Doubao iOS
+        # export this fixture mirrors.
+        assert result.detected["app_provenance"] == "App export provenance (ByteDance Doubao)"
+        assert result.remaining == {}
         assert len(cleaned) == source.stat().st_size
         assert _VIDEO_PAYLOAD in cleaned
         assert _TC260_AIGC not in cleaned
+        assert b'"product":"doubao"' not in cleaned
 
     def test_inspects_native_tc260_in_quicktime_mdir_metadata_list(self, tmp_path: Path):
         # The second Doubao iOS variant: a QuickTime metadata list under
