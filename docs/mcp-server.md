@@ -6,9 +6,9 @@ user's own images and video without a shell. It is a thin wrapper: each tool
 runs one command of this CLI in a child process and returns that command's exit
 code, output path and text.
 
-The subcommand ships in the first release after 0.45.1. The server uses only
-the Python standard library, so the default package runs it. The commands behind
-a tool need the same extras they need on the command line
+The subcommand ships since 0.46.0. The server uses only the Python standard
+library, so the default package runs it. The commands behind a tool need the
+same extras they need on the command line
 ([CLI guide](cli.md#command-dependency-map)). A missing extra comes back as a
 tool error carrying the CLI's install hint.
 

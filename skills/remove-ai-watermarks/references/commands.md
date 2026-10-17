@@ -140,7 +140,7 @@ Output extension must match the input container.
 
 ## MCP server
 
-`remove-ai-watermarks mcp` (new after CLI 0.45.1) serves `identify`, `remove`
+`remove-ai-watermarks mcp` (since CLI 0.46.0) serves `identify`, `remove`
 and `batch` as MCP tools over stdin and stdout for MCP clients. It blocks
 waiting for protocol messages, so do not run it from this skill; call the
 commands above directly.
