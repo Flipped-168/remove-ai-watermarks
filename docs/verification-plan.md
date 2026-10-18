@@ -280,6 +280,12 @@ protocol is in [`synthid-detector-removal-plan.md`](synthid-detector-removal-pla
 Scope honestly: this tier certifies strength floors on a handful of images per vendor, and
 that is all it can do. See `docs/synthid.md`.
 
+The project therefore publishes no aggregate pass rate per model or resolution: a large
+enough sample needs bulk automated checks, which the OpenAI restriction above and the
+SynthID Detector's [additional terms](https://synthid.com/terms) both forbid. Public
+removal claims rest on this method and on individual hash-bound rows such as
+`data/evaluations/video-synthid-oracle.csv`, never on an extrapolated rate.
+
 ### D1. Sampling frame
 
 Select a representative local sample without committing images, identifiers, dataset sizes, or oracle results. Stratify by signal family and preserve the sampling method outside the public repository.
