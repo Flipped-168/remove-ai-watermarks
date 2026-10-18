@@ -46,6 +46,21 @@ It also does not add templates for regulator-defined disclosure icons, such as
 the EU icons in Annex 1 of the Code of Practice on marking and labelling of
 AI-generated content, which deployers use to disclose deepfakes.
 
+It does not remove product branding that a paid plan of the same product turns
+off, such as the "Made with Gamma" badge. A visible mark stays in scope when its
+vendor describes it as identifying AI-generated content, whichever plan turns it
+off: the Gemini sparkle, or the
+[visible watermark](https://support.google.com/gemininotebook/answer/16213268)
+that Gemini Notebook, formerly NotebookLM, adds to generated images and videos.
+
+Watermarks in LLM-generated text are out of scope. The Claude and OpenAI text
+marks change which words the model chooses and add no hidden characters
+([Anthropic](https://www.anthropic.com/news/claude-text-watermark),
+[OpenAI](https://help.openai.com/en/articles/8912793-provenance-signals-in-openai-generated-content)).
+Stripping invisible Unicode does not touch them, only a substantial rewrite
+removes them, and their detectors are not public, so no removal could be
+verified.
+
 The `erase` command is a generic region tool. Users are responsible for having
 the right to edit the selected content.
 

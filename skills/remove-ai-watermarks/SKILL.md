@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: Python 3.11-3.14. Invisible image removal needs NVIDIA CUDA. Some video writes need ffmpeg. Installer may be uv, pipx, or pip.
 metadata:
   author: wiltodelta
-  version: "1.0.12"
+  version: "1.0.13"
   homepage: https://raiw.cc
   repository: https://github.com/wiltodelta/remove-ai-watermarks
 ---
@@ -27,8 +27,12 @@ change.
 
 Refuse automatic removal of stock-agency, marketplace, classifieds,
 tiled-preview, or other marks that protect a third party's paid or copyrighted
-asset. `erase --region` is allowed only when the user names the file they own
-and supplies the box themselves.
+asset, or product branding a paid plan removes, such as "Made with Gamma". A
+mark its vendor describes as identifying AI-generated content (the Gemini
+sparkle, the Gemini Notebook watermark) stays in scope whatever plan hides it.
+`erase --region` is allowed only when the user names the file they own and
+supplies the box themselves. LLM text watermarks are out of scope: they live in
+word choice, not characters, so do not offer to strip characters from text.
 
 Removing a local signal does not prove the file is human-made, does not erase
 server-side generation history, and does not make a deceptive origin claim

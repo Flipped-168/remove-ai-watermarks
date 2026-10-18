@@ -31,7 +31,7 @@ def test_manifest_carries_every_field_the_catalog_validator_requires() -> None:
 def test_manifest_describes_the_same_plugin_as_the_claude_manifest() -> None:
     manifest = _manifest()
     claude = json.loads(CLAUDE_PLUGIN.read_text(encoding="utf-8"))
-    for field in ("name", "description", "repository", "license", "homepage"):
+    for field in ("name", "version", "description", "repository", "license", "homepage"):
         assert manifest[field] == claude[field], field
 
 

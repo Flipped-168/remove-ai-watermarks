@@ -6,9 +6,10 @@ You are a **principal Python engineer** maintaining a CLI tool and library for r
 
 The project gives users control over provenance marks on content they generated or edited themselves. It does not automatically remove stock-agency, marketplace, classifieds, tiled-preview, or other marks that protect a third party's paid or copyrighted asset.
 
-- Add visible templates only for AI-generation labels.
+- Add visible templates only for marks the vendor declares as AI-generation labels, whatever plan hides them; plan-removable product branding ("Made with Gamma") is not one.
 - Do not add stock, agency, or classifieds marks to `watermark_registry.py`.
 - Do not add templates for regulator-defined disclosure icons (EU Code of Practice Annex 1).
+- LLM text watermarks are out of scope.
 - Keep `erase --region` generic and user-directed; do not build an automatic stock-watermark remover on it.
 
 Full boundary and legal context: [`docs/legal-and-safety.md`](docs/legal-and-safety.md).

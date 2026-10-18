@@ -134,6 +134,14 @@ against primary sources before adding jurisdiction-specific claims.
 
 **Google Gemini visible "sparkle" -- tier-dependent, and spec-undocumented by Google.** Google primary sources (the Nano Banana Pro blog and the gemini.google image-generation page, both WebFetch-verified) confirm Gemini images carry BOTH the invisible SynthID (on ALL Google-AI media) AND a visible sparkle, but the visible mark is **tier-gated**: applied for FREE and Google AI **Pro** users, and **REMOVED** for Google AI **Ultra** subscribers, inside **Google AI Studio**, and on **API / dev** output. Update 2026-09-23: since 2026-08-14 a Gemini "Media watermark" setting lets any consumer tier switch the visible mark off for images, Omni video and Lyria music, except work accounts and India, South Korea and Vietnam without Ultra (Gemini help 17405358; the setting was observed in the Gemini web app on 2026-09-23). The tier-gating above is therefore no longer the only reason a sparkle is missing. So a Google-C2PA image with NO visible sparkle is expected (setting off, Ultra, API), not evidence it is clean -- this reinforces the `identify` "no visible mark != clean" rule. The ONLY official verifier is the SynthID flow: upload to the Gemini app and ask directly whether the file contains a SynthID watermark, requiring the SynthID verification tool and prohibiting inference from visible content, logos, text, or metadata. A generic question about AI generation is not an oracle result. The tool reads the INVISIBLE mark; there is **no official visible-sparkle detector**, and Google publishes **no** glyph geometry / size / opacity / color / locale / placement spec. So our capture-based sparkle template is the only source of truth and cannot be validated against a vendor spec -- keep reverse-engineering from real captures (do not expect a published spec).
 
+**Gemini Notebook, formerly NotebookLM, adds its own visible watermark.** Google's
+[plan help](https://support.google.com/gemininotebook/answer/16213268) says the mark
+is added to generated images and videos "to further help you identify AI-generated
+content", and AI Pro and Ultra subscribers can turn it off. That makes it an
+AI-generation label under the [project scope](legal-and-safety.md#out-of-scope). No
+template is registered, because no publication-cleared export has been captured;
+slide decks export as PDF or PPTX, which the project does not process.
+
 **Google Veo video marks use two incompatible visible designs.** Public raw
 clips verify the current four-point diamond and the legacy bottom-right `Veo`
 text. The independent
