@@ -214,3 +214,61 @@ def test_clawhub_uses_local_install(tmp_path: Path) -> None:
         "login --token synthetic",
         "inspect remove-ai-watermarks --file SKILL.md",
     ]
+
+
+@pytest.mark.skipif(os.name != "posix" or shutil.which("bash") is None, reason="Executes an Ubuntu Bash workflow")
+@pytest.mark.parametrize(("status", "listed"), [("200", "true"), ("404", "false"), ("503", None)])
+def test_mcp_registry_lookup_skips_listed_versions_and_fails_on_other_replies(
+    tmp_path: Path, status: str, listed: str | None
+) -> None:
+    workflow = _workflow("publish-mcp-registry.yml")
+    script = _step("publish-mcp-registry.yml", "publish", "Skip a version the registry already lists")["run"]
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    curl = bin_dir / "curl"
+    curl.write_text(f'#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALL_LOG"\nprintf {status}\n')
+    curl.chmod(0o755)
+    env = {
+        **os.environ,
+        **workflow["jobs"]["publish"]["env"],
+        "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+        "VERSION": "0.46.0",
+        "GITHUB_OUTPUT": str(tmp_path / "output"),
+        "GITHUB_STEP_SUMMARY": str(tmp_path / "summary"),
+        "CALL_LOG": str(tmp_path / "calls"),
+    }
+    result = subprocess.run(["bash", "-c", script], cwd=tmp_path, env=env, capture_output=True, text=True)
+    # The server name carries a slash, so it must reach the registry percent-encoded.
+    assert "/v0/servers/io.github.wiltodelta%2Fremove-ai-watermarks/versions/0.46.0" in (tmp_path / "calls").read_text()
+    if listed is None:
+        assert result.returncode != 0
+        return
+    assert result.returncode == 0, result.stderr
+    assert f"listed={listed}" in (tmp_path / "output").read_text()
+
+
+@pytest.mark.skipif(os.name != "posix" or shutil.which("bash") is None, reason="Executes an Ubuntu Bash workflow")
+@pytest.mark.parametrize(
+    ("release", "package", "accepted"),
+    [("1.0.0", "1.0.0", True), ("1.0.1", "1.0.0", False), ("1.0.0", "1.0.1", False)],
+)
+def test_mcp_registry_publishes_only_a_server_json_that_matches_the_release(
+    tmp_path: Path, release: str, package: str, accepted: bool
+) -> None:
+    workflow = _workflow("publish-mcp-registry.yml")
+    script = _step("publish-mcp-registry.yml", "publish", "Check server.json matches the release")["run"]
+    manifest = json.loads((ROOT / "server.json").read_text(encoding="utf-8"))
+    manifest["version"] = "1.0.0"
+    # A stale package entry under a bumped server version must not publish either.
+    manifest["packages"][0]["version"] = package
+    (tmp_path / "server.json").write_text(json.dumps(manifest), encoding="utf-8")
+    env = {**os.environ, **workflow["jobs"]["publish"]["env"], "VERSION": release}
+    result = subprocess.run(["bash", "-c", script], cwd=tmp_path, env=env, capture_output=True, text=True)
+    assert (result.returncode == 0) == accepted, result.stderr
+
+
+def test_mcp_registry_publishes_on_release_with_an_oidc_token() -> None:
+    workflow = _workflow("publish-mcp-registry.yml")
+    assert workflow["permissions"]["id-token"] == "write"
+    # PyYAML reads the bare `on:` key as the boolean True.
+    assert set(workflow[True]) == {"release", "workflow_dispatch"}

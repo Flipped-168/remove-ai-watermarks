@@ -36,7 +36,7 @@ The gate does not pass `--ignore-unfixed` to uv-secure, so a transitive CVE with
 
 Command, gate, typing, and model-test invariants auto-load from [`.claude/rules/development.md`](.claude/rules/development.md). Environment recovery, CI behavior, and fixture policy live in [`docs/development.md`](docs/development.md).
 
-Before a release, read [`docs/release-and-distribution.md`](docs/release-and-distribution.md). Treat the release as complete only after PyPI, Homebrew, the Hugging Face Space, and the ComfyUI Registry are verified; conda is not published. Keep the source-distribution public allowlist.
+Before a release, read [`docs/release-and-distribution.md`](docs/release-and-distribution.md). Treat the release as complete only after PyPI, Homebrew, the Hugging Face Space, and the ComfyUI Registry are verified; conda is not published. The MCP registry listing publishes itself from `publish-mcp-registry.yml` and does not block a release. Keep the source-distribution public allowlist.
 
 The published Agent Skill is [`skills/remove-ai-watermarks/`](skills/remove-ai-watermarks/). Update it in the same change as any CLI edit that alters commands, extras, exit codes, mark keys, or the intended-use boundary. Install and publish steps: [`docs/agent-skill.md`](docs/agent-skill.md).
 

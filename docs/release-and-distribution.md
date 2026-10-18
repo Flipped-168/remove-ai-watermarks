@@ -227,14 +227,13 @@ submission state and links live in
 `uvx remove-ai-watermarks mcp`. The registry accepts it only after PyPI serves a
 release whose description, the README, carries the `mcp-name:` marker, and
 `tests/test_mcp_server.py` pins `server.json` to the package version. The listing
-is not a release surface that blocks a release; after PyPI publishes a version:
+is not a release surface that blocks a release.
 
-1. `mcp-publisher login github` with an account that owns `wiltodelta`;
-2. `mcp-publisher validate` and then `mcp-publisher publish` from the
-   repository root;
-3. read the entry back from
-   `https://registry.modelcontextprotocol.io/v0/servers?search=io.github.wiltodelta/remove-ai-watermarks`
-   and check its version.
+[`publish-mcp-registry.yml`](../.github/workflows/publish-mcp-registry.yml)
+publishes it on every published GitHub Release, once PyPI serves that version.
+GitHub OIDC proves ownership of the `io.github.wiltodelta` namespace, so no login
+or secret is stored. To list a version already on PyPI, dispatch the workflow
+with that version; a version the registry already lists is skipped.
 
 [`glama.json`](../glama.json) names the maintainer for Glama's claim flow.
 Client setup and the tool contract are in [the MCP server guide](mcp-server.md).

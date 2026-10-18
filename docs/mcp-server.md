@@ -87,5 +87,6 @@ default mode, receives method-not-found and falls back to the handshake.
 `io.github.wiltodelta/remove-ai-watermarks`. The registry verifies ownership by
 the `mcp-name:` marker in `README.md`, which becomes the PyPI description, so it
 can only verify a release whose README carries that marker.
-[`glama.json`](../glama.json) names the maintainer for Glama. Publishing steps
-are in [release and distribution](release-and-distribution.md#mcp-registry).
+[`glama.json`](../glama.json) names the maintainer for Glama. Each release is
+published automatically; the workflow is described in
+[release and distribution](release-and-distribution.md#mcp-registry).
