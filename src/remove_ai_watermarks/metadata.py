@@ -1968,6 +1968,25 @@ def strip_and_verify(
     """
     if (reason := unreadable_reason(source_path)) is not None:
         raise ValueError(f"cannot read {source_path.name}: {reason}")
+    return _strip_and_rescan(source_path, output_path, keep_standard=keep_standard)
+
+
+def strip_written_output(path: Path, *, keep_standard: bool = True) -> dict[str, str]:
+    """Strip ``path`` in place and return the markers that survived.
+
+    For a file whose pixels this run has already decoded or written itself, so the
+    readability probe that :func:`strip_and_verify` runs first would only decode
+    them a second time.
+    """
+    return _strip_and_rescan(path, path, keep_standard=keep_standard)[1]
+
+
+def _strip_and_rescan(
+    source_path: Path,
+    output_path: Path | None,
+    *,
+    keep_standard: bool,
+) -> tuple[Path, dict[str, str]]:
     out = remove_ai_metadata(source_path, output_path, keep_standard=keep_standard)
     remaining = get_ai_metadata(out)
     if not remaining:

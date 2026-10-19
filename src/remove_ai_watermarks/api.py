@@ -157,10 +157,9 @@ def _write_visible_result(
             raise OSError(f"failed to write output (is the destination writable?): {out_path}")
 
         if strip_metadata:
-            from remove_ai_watermarks.metadata import strip_and_verify
+            from remove_ai_watermarks.metadata import strip_written_output
 
-            _, leftover = strip_and_verify(staged, staged)
-            if leftover:
+            if leftover := strip_written_output(staged):
                 raise MetadataStripIncomplete(set(leftover))
 
 
@@ -464,7 +463,7 @@ def remove_all(
     import tempfile
 
     from remove_ai_watermarks import image_io, watermark_registry
-    from remove_ai_watermarks.metadata import strip_and_verify
+    from remove_ai_watermarks.metadata import strip_written_output
 
     def say(stage: str, detail: str) -> None:
         if progress is not None:
@@ -519,8 +518,7 @@ def remove_all(
         # ── 3. AI metadata ──
         # Read the pristine ORIGINAL for provenance above and the STAGED file here:
         # the visible pass has already dropped this file's C2PA.
-        _, leftover = strip_and_verify(staged, staged)
-        if leftover:
+        if leftover := strip_written_output(staged):
             # Before the write, on purpose -- see MetadataStripIncomplete.
             raise MetadataStripIncomplete(set(leftover))
         say("metadata", "stripped")

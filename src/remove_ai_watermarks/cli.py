@@ -467,7 +467,7 @@ def _write_output_or_exit(
     published, so a marker that survives exits 1 with nothing written. Both commands
     using this used to swallow a failed strip unless ``--verbose`` was set."""
     from remove_ai_watermarks._internal.utils import staged_sibling
-    from remove_ai_watermarks.metadata import strip_and_verify
+    from remove_ai_watermarks.metadata import strip_written_output
 
     output.parent.mkdir(parents=True, exist_ok=True)
     with staged_sibling(output) as staged:
@@ -477,7 +477,7 @@ def _write_output_or_exit(
         if not strip_metadata:
             return
         try:
-            _, leftover = strip_and_verify(staged, staged)
+            leftover = strip_written_output(staged)
         except (OSError, RuntimeError, ValueError) as e:
             console.print(f"  Error: failed to strip AI metadata from {output}: {e}")
             raise SystemExit(1) from e
