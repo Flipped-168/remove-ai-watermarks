@@ -52,35 +52,44 @@ Do these in order after the skill is on the default branch.
    people run `npx skills add`. The listing is live and has recorded real
    installs; the README install line remains the seed, not a registration.
 4. **Awesome-list PRs.** Hand-curated GitHub lists are how people browse skills
-   today. One accurate PR per list, with the scope sentence intact.
-   - `ComposioHQ/awesome-claude-skills`: submitted 2026-09-05 as PR 1841
-     (Creative & Media); no maturity bar in its contribution rules. Rechecked
-     2026-09-11: still open, CI green, no review comments, waiting on the
-     list maintainers.
-   - `heilcheng/awesome-agent-skills`: submitted 2026-09-09 as PR 483 under
+   today. One accurate PR per list, with the scope sentence intact. This list
+   keeps each list's entry rules and the submission; read live review state
+   from GitHub (`gh search prs --author @me --state open remove-ai-watermarks`
+   lists every open one), not from here.
+   - `ComposioHQ/awesome-claude-skills`: submitted 2026-09-05 as
+     [PR 1841](https://github.com/ComposioHQ/awesome-claude-skills/pull/1841)
+     (Creative & Media); no maturity bar in its contribution rules.
+   - `heilcheng/awesome-agent-skills`: submitted 2026-09-09 as
+     [PR 483](https://github.com/heilcheng/awesome-agent-skills/pull/483) under
      Community Skills > Media. The skill's three concrete input/output examples
-     satisfy the list's working-example requirement. Rechecked 2026-09-11:
-     still open; the only check failure is their Vercel deploy authorization,
+     satisfy the list's working-example requirement. The maintainer put it
+     `on hold` on 2026-10-15: "Tool strips AI provenance (SynthID/C2PA); policy
+     call for maintainer". Its Vercel check fails on deploy authorization,
      which a contributor cannot grant.
-   - `VoltAgent/awesome-agent-skills`: DEFERRED. Its CONTRIBUTING rejects
-     brand-new skills ("give your skill time to mature and gain users before
-     submitting"). The skill now has real installs and shipped releases, but
-     adoption remains too small to make the list's maturity claim comfortably.
+   - `VoltAgent/awesome-agent-skills`: submitted 2026-10-17 as
+     [PR 1225](https://github.com/VoltAgent/awesome-agent-skills/pull/1225), a
+     one-line entry. Its CONTRIBUTING requires "real community usage" ("Give
+     your skill time to mature and gain users before submitting").
    - `VoltAgent/awesome-openclaw-skills`: DEFERRED on adoption only. Entries
      are indexed via clawskills.sh, and the ClawHub prerequisite in step 6 is
      now met. The list still requires proven real-world usage. Re-attempt once
      the ClawHub listing shows organic installs.
-   - `hashgraph-online/awesome-codex-plugins`: READY, not submitted. It lists
-     only Codex plugins, so it needs `.codex-plugin/plugin.json` and the icon in
-     `assets/icon.svg`. Its contribution CI runs `scripts/validate-plugin-pr.py`
-     against the repository's `HEAD.zip`, then the HOL plugin scanner with a
-     minimum score of 80 and no high finding; that scan job is
-     `continue-on-error`, so it reports rather than blocks. The scanner's `\beval\s*\(`
-     rule also matches PyTorch's `.eval()`, which is why the code calls
-     `.train(False)`. On 2026-10-17 `plugin-scanner` 3.49.0 scored the tree 86
-     with no high finding. The remaining loss is a tracked video over the
-     scanner's 16 MiB file budget. Recheck with
-     `uvx --from plugin-scanner==3.49.0 plugin-scanner scan . --min-score 80 --fail-on-severity high`.
+   - `hashgraph-online/awesome-codex-plugins`: merged 2026-10-19 as
+     [PR 541](https://github.com/hashgraph-online/awesome-codex-plugins/pull/541).
+     It lists only Codex plugins, so the entry depends on
+     `.codex-plugin/plugin.json` and the icon in `assets/icon.svg`. Its
+     contribution CI runs `scripts/validate-plugin-pr.py` against the
+     repository's `HEAD.zip`, then the HOL plugin scanner with a minimum score
+     of 80 and no high finding, as `continue-on-error`. The scanner's
+     `\beval\s*\(` rule also matches PyTorch's `.eval()`, which is why the code
+     calls `.train(False)`. Before changing the plugin, rescan with
+     `uvx --from plugin-scanner==3.49.0 plugin-scanner scan . --min-score 80 --fail-on-severity high`
+     (86 with no high finding on 2026-10-17; the loss is a tracked video over
+     the scanner's 16 MiB file budget).
+   - `punkpeye/awesome-mcp-servers`: submitted 2026-10-18 as
+     [PR 16924](https://github.com/punkpeye/awesome-mcp-servers/pull/16924) for
+     the MCP server. The list requires a Glama listing and the Glama score
+     badge; its bot checks both and labels the PR `has-glama`.
 5. **Claude community marketplace.** Form at
    [platform.claude.com/plugins/submit](https://platform.claude.com/plugins/submit)
    (individuals) or the claude.ai directory form (Team/Enterprise). Validate
