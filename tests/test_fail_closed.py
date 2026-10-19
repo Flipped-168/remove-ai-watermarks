@@ -239,6 +239,29 @@ class TestSkippedStepsAreFailures:
         remover = object.__new__(WatermarkRemover)  # the writer needs no model state
         with pytest.raises(RuntimeError, match="survived"):
             remover._write_output(Image.new("RGB", (16, 16)), tmp_path / "out.png")
+        assert list(tmp_path.iterdir()) == [], "an output that kept its AI metadata was published"
+
+    @pytest.mark.parametrize("command", ["erase", "remove_visible", "invisible_writer"])
+    def test_an_output_the_package_just_wrote_is_not_probed_again(self, tmp_path, clean_png, monkeypatch, command):
+        """The readability probe decodes every pixel; on our own encode it is pure waste."""
+        from PIL import Image
+
+        from remove_ai_watermarks._internal.watermark_remover import WatermarkRemover
+        from remove_ai_watermarks.api import remove_visible
+
+        probed: list[Path] = []
+        real = metadata.unreadable_reason
+        monkeypatch.setattr(metadata, "unreadable_reason", lambda path: probed.append(path) or real(path))
+        out = tmp_path / "out.png"
+        if command == "erase":
+            result = _invoke(["erase", "--region", "2,2,10,10", str(clean_png), "-o", str(out)])
+            assert result.exit_code == 0, result.output
+        elif command == "remove_visible":
+            remove_visible(clean_png, out, write_noop=True)
+        else:
+            object.__new__(WatermarkRemover)._write_output(Image.new("RGB", (16, 16)), out)
+        assert out.exists()
+        assert [p for p in probed if p.name != clean_png.name] == []
 
     def test_metadata_remove_reports_a_missing_ffmpeg_without_a_traceback(self, tmp_path, monkeypatch):
         monkeypatch.setattr(shutil, "which", lambda _name: None)

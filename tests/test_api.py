@@ -430,7 +430,7 @@ class TestRemoveAllLibrary:
         from remove_ai_watermarks import api, invisible_engine, metadata
 
         monkeypatch.setattr(invisible_engine, "is_available", lambda: False)
-        monkeypatch.setattr(metadata, "strip_and_verify", lambda src, dst: (dst, {"c2pa"}))
+        monkeypatch.setattr(metadata, "strip_written_output", lambda _path: {"c2pa": "survived"})
         out = tmp_path / "clean.png"
 
         with pytest.raises(api.MetadataStripIncomplete, match="c2pa"):

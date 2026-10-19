@@ -675,10 +675,7 @@ class TestAllCommand:
             # The no-signal gate lives in the library now; patch it there, not on the
             # CLI module, or the diffusion stage runs for real.
             patch("remove_ai_watermarks.api._SourceEvidence.has_invisible_target", return_value=False),
-            patch(
-                "remove_ai_watermarks.metadata.strip_and_verify",
-                return_value=(tmp_path / "intermediate.png", {"c2pa": True}),
-            ),
+            patch("remove_ai_watermarks.metadata.strip_written_output", return_value={"c2pa": "survived"}),
         ):
             result = runner.invoke(main, ["all", str(sample_png), "-o", str(output)])
 

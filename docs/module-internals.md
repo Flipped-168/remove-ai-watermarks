@@ -68,10 +68,14 @@ Important contracts:
 - `visible` and `erase` strip and verify AI metadata on a staged sibling and exit
   `1` with nothing published when a marker survives; they used to swallow a failed
   strip unless `--verbose` was set. The library `remove_visible` does the same and
-  raises `MetadataStripIncomplete`, as `remove_all` already did, and the diffusion
-  writer behind `invisible` raises when its own strip leaves a marker.
+  raises `MetadataStripIncomplete`, as `remove_all` already did. The diffusion
+  writer behind `invisible` stages the same way and raises with nothing published
+  (fixed 2026-10-19; it used to leave the marked file at the output path).
   `_internal.utils.staged_sibling` is the shared stage: it never pre-creates the
-  name, so the published file keeps the default permissions.
+  name, so the published file keeps the default permissions. These writers strip
+  through `metadata.strip_written_output`, which skips the readability probe:
+  the file is the package's own encode, and the probe's full decode doubled the
+  cost of the strip (decided 2026-10-19).
 - A quiet `metadata --check` and a successful `metadata --remove` (same for
   `video metadata`) end by repeating the `identify` limit: the pixel channel is
   untouched and a watermark such as SynthID has no local decoder once its
