@@ -29,6 +29,12 @@ from remove_ai_watermarks.metadata import (
     xai_signature,
 )
 
+
+def _blanked(box: bytes) -> bytes:
+    """The same-length ``free`` box ``strip_c2pa_boxes`` leaves in place of a 32-bit-size box."""
+    return box[:4] + b"free" + bytes(len(box) - 8)
+
+
 # Real, committed C2PA sample images used to ground the SynthID-source tests.
 SAMPLES_DIR = Path(__file__).resolve().parent.parent / "data" / "fixtures" / "provenance"
 
@@ -123,7 +129,7 @@ class TestHasAiMetadata:
         assert has_ai_metadata(path)
 
     def test_strip_c2pa_boxes_removes_uuid_box(self, tmp_path: Path):
-        """ISOBMFF strip should drop the C2PA uuid box and keep everything else."""
+        """ISOBMFF strip should blank the C2PA uuid box in place and keep everything else."""
         from remove_ai_watermarks._internal.isobmff import strip_c2pa_boxes
         from remove_ai_watermarks.metadata import C2PA_UUID
 
@@ -133,7 +139,7 @@ class TestHasAiMetadata:
         mdat = b"\x00\x00\x00\x10mdat" + b"pixeldat"
         cleaned, stripped = strip_c2pa_boxes(ftyp + uuid_box + mdat)
         assert stripped == 1
-        assert cleaned == ftyp + mdat
+        assert cleaned == ftyp + _blanked(uuid_box) + mdat
 
     def test_strip_c2pa_boxes_passthrough_for_non_isobmff(self):
         """Non-ISOBMFF input must be returned unchanged."""
@@ -145,7 +151,7 @@ class TestHasAiMetadata:
         assert cleaned == data
 
     def test_remove_ai_metadata_strips_c2pa_in_avif(self, tmp_path: Path):
-        """End-to-end: ``remove_ai_metadata`` on a fake .avif drops the C2PA box."""
+        """End-to-end: ``remove_ai_metadata`` on a fake .avif blanks the C2PA box."""
         from remove_ai_watermarks.metadata import C2PA_UUID, remove_ai_metadata
 
         src = tmp_path / "in.avif"
@@ -157,7 +163,7 @@ class TestHasAiMetadata:
         out = tmp_path / "out.avif"
         result = remove_ai_metadata(src, out)
         assert result == out
-        assert out.read_bytes() == ftyp + mdat
+        assert out.read_bytes() == ftyp + _blanked(uuid_box) + mdat
         # And after stripping, detection must no longer flag the cleaned file.
         from remove_ai_watermarks.metadata import has_ai_metadata
 
@@ -2084,7 +2090,7 @@ class TestIsobmffMetadataRemoval:
     """Container-level AI-provenance stripping across ISOBMFF image/video/audio."""
 
     def test_strips_ai_xmp_uuid_box(self):
-        # A uuid box carrying a TC260 AIGC label is dropped by content match,
+        # A uuid box carrying a TC260 AIGC label is blanked by content match,
         # regardless of the (non-C2PA) XMP UUID's byte order.
         from remove_ai_watermarks._internal.isobmff import strip_c2pa_boxes
 
@@ -2093,7 +2099,7 @@ class TestIsobmffMetadataRemoval:
         box = (24 + len(payload)).to_bytes(4, "big") + b"uuid" + xmp_uuid + payload
         cleaned, stripped = strip_c2pa_boxes(_MP4_FTYP + box + _MP4_MDAT)
         assert stripped == 1
-        assert cleaned == _MP4_FTYP + _MP4_MDAT
+        assert cleaned == _MP4_FTYP + _blanked(box) + _MP4_MDAT
 
     def test_keeps_plain_non_ai_xmp(self):
         # A uuid box with ordinary (non-AI) XMP must be preserved.
@@ -2125,7 +2131,7 @@ class TestIsobmffMetadataRemoval:
         src.write_bytes(_MP4_FTYP + uuid_box + _MP4_MDAT)
         out = tmp_path / "out.bin"
         remove_ai_metadata(src, out)
-        assert out.read_bytes() == _MP4_FTYP + _MP4_MDAT
+        assert out.read_bytes() == _MP4_FTYP + _blanked(uuid_box) + _MP4_MDAT
 
     def test_unparseable_audio_raises(self, tmp_path: Path):
         # Garbage that ffmpeg can't parse must raise a clear error, not crash in
@@ -2557,3 +2563,85 @@ class TestTc260AudioPlacements:
         cleaned = tmp_path / f"clean{suffix}"
         remove_ai_metadata(source, cleaned)
         assert "aigc_label" not in get_ai_metadata(cleaned)
+
+
+def _shift_heif_iloc(data: bytes, delta: int) -> bytes:
+    """Add ``delta`` to every file-offset extent in the HEIF ``iloc`` box.
+
+    Lets a test insert a box ahead of ``mdat`` the way a C2PA signer does, which
+    moves the coded image by ``delta`` bytes and so needs ``iloc`` rewritten.
+    """
+    out = bytearray(data)
+    meta = data.index(b"meta") - 4
+    iloc = data.index(b"iloc", meta) - 4
+    version = data[iloc + 8]
+    pos = iloc + 12
+    offset_size, length_size = data[pos] >> 4, data[pos] & 15
+    base_size = data[pos + 1] >> 4
+    index_size = data[pos + 1] & 15 if version in (1, 2) else 0
+    pos += 2
+    id_size = 2 if version < 2 else 4
+    count = int.from_bytes(data[pos : pos + id_size], "big")
+    pos += id_size
+    for _ in range(count):
+        pos += id_size
+        method = 0
+        if version in (1, 2):
+            method = data[pos + 1] & 15
+            pos += 2
+        pos += 2  # data_reference_index
+        base = int.from_bytes(data[pos : pos + base_size], "big") if base_size else 0
+        if method == 0 and base_size:
+            out[pos : pos + base_size] = (base + delta).to_bytes(base_size, "big")
+        pos += base_size
+        extents = int.from_bytes(data[pos : pos + 2], "big")
+        pos += 2
+        for _ in range(extents):
+            pos += index_size
+            if method == 0 and not base_size:
+                offset = int.from_bytes(data[pos : pos + offset_size], "big")
+                out[pos : pos + offset_size] = (offset + delta).to_bytes(offset_size, "big")
+            pos += offset_size + length_size
+    return bytes(out)
+
+
+class TestIsobmffStripKeepsOffsets:
+    """A HEIF locates its coded image through absolute ``iloc`` offsets, and an MP4
+    through ``stco``/``co64``. Dropping a C2PA ``uuid`` box that sits ahead of
+    ``mdat`` moved the image without rewriting them, so the cleaned HEIC no longer
+    decoded (a phone HEIC, 2026-10-13)."""
+
+    def test_c2pa_box_before_mdat_keeps_heic_decodable(self, tmp_path: Path):
+        pillow_heif = pytest.importorskip("pillow_heif")
+        pillow_heif.register_heif_opener()
+        plain = tmp_path / "plain.heic"
+        Image.new("RGB", (64, 48), (200, 30, 30)).save(plain, format="HEIF")
+        data = plain.read_bytes()
+        c2pa_box = struct.pack(">I", 8 + 16 + 64) + b"uuid" + C2PA_UUID + b"\x07" * 64
+        mdat = data.index(b"mdat") - 4
+        signed = _shift_heif_iloc(data[:mdat], len(c2pa_box)) + c2pa_box + data[mdat:]
+        source = tmp_path / "signed.heic"
+        source.write_bytes(signed)
+        with Image.open(source) as im:
+            expected = im.convert("RGB").tobytes()
+
+        cleaned = remove_ai_metadata(source, tmp_path / "clean.heic")
+
+        assert C2PA_UUID not in cleaned.read_bytes()
+        with Image.open(cleaned) as im:
+            assert im.convert("RGB").tobytes() == expected
+
+    def test_blanked_box_keeps_every_later_offset(self):
+        from remove_ai_watermarks._internal.isobmff import strip_c2pa_boxes
+
+        ftyp = b"\x00\x00\x00\x18ftypheic\x00\x00\x00\x00mif1heic"
+        c2pa_box = struct.pack(">I", 8 + 16 + 8) + b"uuid" + C2PA_UUID + b"manifest"
+        mdat = b"\x00\x00\x00\x10mdat" + b"pixeldat"
+        data = ftyp + c2pa_box + mdat
+
+        cleaned, stripped = strip_c2pa_boxes(data)
+
+        assert stripped == 1
+        assert len(cleaned) == len(data)
+        assert cleaned.index(b"mdat") == data.index(b"mdat")
+        assert cleaned == ftyp + _blanked(c2pa_box) + mdat
