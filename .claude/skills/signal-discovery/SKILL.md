@@ -84,7 +84,13 @@ finding.
 9. Run `bash maintain.sh`. Report evidence limits, incomplete rows, crashes,
    unsupported formats, and oracle-unavailable cohorts explicitly.
 
-External oracle uploads are separate mutations. Use the `provider-oracles`
-skill only for a bounded, already-selected candidate, and obtain the required
-action-time upload approval. Do not adapt candidates against an oracle, retry
-automatically, or substitute one provider's verdict for another's.
+External oracle uploads use the `provider-oracles` skill. When a cohort needs a
+provider verdict, walk that skill's plan automatically: API first, then the Web
+oracle, including `synthid-web` at synthid.com for Google, then the remaining
+configured account slots. A signed-in account is required only for Gemini.
+Every other Web surface, including `synthid-web`, may use isolated Playwright
+and a proxy, and each proxied run picks a new session in Europe or the United
+States. If SynthID Detector asks for a sign-in, continue that file in the user's
+existing real Chrome on the direct route, and do not start a new login. Do not ask for
+confirmation before switching, and do not adapt candidates against an oracle.
+Do not substitute one provider's verdict for another's.

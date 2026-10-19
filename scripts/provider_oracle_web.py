@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 import re
+import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import monotonic
@@ -22,7 +24,35 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-PLAYWRIGHT_SURFACES = frozenset({"openai-web", "microsoft-web", "meta-web"})
+PLAYWRIGHT_SURFACES = frozenset({"openai-web", "microsoft-web", "meta-web", "synthid-web"})
+# A proxy exit is chosen when the run starts. These are the countries that
+# choice may use: the United States and European ISO codes.
+EUROPE_OR_US_COUNTRIES = (
+    "AT",
+    "BE",
+    "CH",
+    "CZ",
+    "DE",
+    "DK",
+    "ES",
+    "FI",
+    "FR",
+    "GB",
+    "GR",
+    "HU",
+    "IE",
+    "IT",
+    "NL",
+    "NO",
+    "PL",
+    "PT",
+    "RO",
+    "SE",
+    "US",
+)
+_THORDATA_COUNTRY = re.compile(r"-country-[A-Za-z]{2}", re.IGNORECASE)
+_THORDATA_SESSION = re.compile(r"-sessid-[A-Za-z0-9]+", re.IGNORECASE)
+_THORDATA_SESSION_TIME = re.compile(r"-sesstime-\d+", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -51,6 +81,11 @@ _RESULT_MARKERS = {
         "No AI signatures from Meta were found",
         "No AI signatures were found",
     ),
+    "synthid-web": (
+        "Watermark detected",
+        "Watermark not detected",
+        "SynthID was not detected",
+    ),
 }
 
 _REFUSAL_MARKERS = (
@@ -63,7 +98,10 @@ _REFUSAL_MARKERS = (
     "access denied",
 )
 
-_INDETERMINATE_MARKERS = ("Something went wrong. Please try again. If the issue persists, contact support.",)
+_INDETERMINATE_MARKERS = (
+    "Something went wrong. Please try again. If the issue persists, contact support.",
+    "Please sign in before detection.",
+)
 
 
 def _contains_any(text: str, markers: tuple[str, ...]) -> bool:
@@ -111,6 +149,16 @@ def parse_provider_result(surface: str, page_text: str) -> WebVerdict:
             return WebVerdict("detected", provenance, response)
         if "inconclusive" in lowered or "no provenance detected" in lowered:
             return WebVerdict("not_detected", provenance, response)
+    elif surface == "synthid-web":
+        # The exact labels are the verdict. A page that shows both, or that
+        # asks for a sign-in, has no single watermark result. The sign-in
+        # sentence is kept; the skill then continues in the user's existing Chrome.
+        detected = "Watermark detected" in response
+        not_detected = "Watermark not detected" in response or "SynthID was not detected" in response
+        if not_detected and not detected:
+            return WebVerdict("not_detected", "unavailable", response)
+        if detected and not not_detected:
+            return WebVerdict("detected", "unavailable", response)
     else:
         if "no ai signatures from meta were found" in lowered or "no ai signatures were found" in lowered:
             return WebVerdict("not_detected", "unavailable", response)
@@ -123,13 +171,37 @@ def parse_provider_result(surface: str, page_text: str) -> WebVerdict:
     return WebVerdict("indeterminate", provenance, response or "Provider page returned no readable result")
 
 
+def choose_proxy_country(rng: random.Random | None = None) -> str:
+    """Pick one exit country from Europe or the United States."""
+    picker = random.SystemRandom() if rng is None else rng
+    return picker.choice(EUROPE_OR_US_COUNTRIES)
+
+
+def new_proxy_session() -> str:
+    """Return a new ThorData session id. A later call does not reuse it."""
+    return "s" + secrets.token_hex(8)
+
+
+def fresh_thordata_username(username: str, *, country: str, session_id: str) -> str:
+    """Drop a prepared country and session, then attach the ones for this run."""
+    if country not in EUROPE_OR_US_COUNTRIES:
+        raise ValueError("proxy country must be in Europe or the US")
+    if re.fullmatch(r"[A-Za-z0-9]{1,32}", session_id) is None:
+        raise ValueError("proxy session id must be 1-32 ASCII letters or digits")
+    base = _THORDATA_SESSION_TIME.sub("", username)
+    base = _THORDATA_SESSION.sub("", base)
+    base = _THORDATA_COUNTRY.sub("", base).strip("-")
+    return f"{base}-country-{country}-sessid-{session_id}-sesstime-90"
+
+
 def proxy_settings(
     slot: oracles.ExecutionSlot,
     environ: Mapping[str, str] = os.environ,
     *,
-    sticky_session_id: str | None = None,
+    country: str | None = None,
+    session_id: str | None = None,
 ) -> ProxySettings | None:
-    """Resolve a secret proxy URL and pin rotating ThorData routes per batch."""
+    """Resolve a secret proxy URL. A ThorData exit is chosen for this call."""
     variable = slot.get("proxy_url_env")
     if variable is None:
         return None
@@ -147,10 +219,11 @@ def proxy_settings(
     if parsed.username is not None:
         username = unquote(parsed.username)
         is_thordata = parsed.hostname.endswith((".thordata.net", ".thordata.online"))
-        if is_thordata and sticky_session_id is not None and "-sessid-" not in username.casefold():
-            if re.fullmatch(r"[A-Za-z0-9]{1,32}", sticky_session_id) is None:
-                raise ValueError("sticky_session_id must be 1-32 ASCII letters or digits")
-            username = f"{username}-sessid-{sticky_session_id}-sesstime-90"
+        if is_thordata:
+            chosen_country = choose_proxy_country() if country is None else country
+            chosen_session = new_proxy_session() if session_id is None else session_id
+            username = fresh_thordata_username(username, country=chosen_country, session_id=chosen_session)
+            log.info("ThorData proxy exit country=%s session=%s", chosen_country, chosen_session)
         settings["username"] = username
     if parsed.password is not None:
         settings["password"] = unquote(parsed.password)
@@ -198,7 +271,7 @@ def _set_upload_file(page: Page, surface: str, upload: Path, timeout_seconds: fl
         # OpenAI keeps background requests alive, so network-idle is
         # unreachable. Its visible input becomes handler-ready at page load.
         page.wait_for_load_state("load", timeout=timeout_ms)
-    elif surface in {"meta-web", "microsoft-web"}:
+    elif surface in {"meta-web", "microsoft-web", "synthid-web"}:
         # These pages mount hidden inputs before their selection handlers are
         # active. Network-idle is the observable handler-readiness seam.
         page.wait_for_load_state("networkidle", timeout=timeout_ms)
@@ -296,11 +369,7 @@ def run_web_batch(
     if slot is None:
         raise ValueError("Playwright batches require an explicit execution slot")
     secret_values = dict(environ) if env_file is None else oracles.secret_environment(env_file, environ=environ)
-    proxy = proxy_settings(
-        slot,
-        secret_values,
-        sticky_session_id=f"oracle{results['manifest_sha256'][:16]}",
-    )
+    proxy = proxy_settings(slot, secret_values)
     pending = [
         (manifest_row, result_row)
         for manifest_row, result_row in zip(manifest["rows"], results["rows"], strict=True)

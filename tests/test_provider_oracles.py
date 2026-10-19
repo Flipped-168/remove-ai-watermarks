@@ -36,7 +36,8 @@ def test_catalog_covers_every_project_vendor_oracle_surface() -> None:
         "do not infer from visible content, logos, text, or metadata."
     )
     synthid = oracles.SURFACES["synthid-web"]
-    assert synthid.automation == "real_browser"
+    assert synthid.automation == "playwright"
+    assert synthid.account_slots is False
     assert synthid.provider_key == "google"
     assert synthid.url == "https://synthid.com/"
     assert synthid.media_types == ("image", "video", "audio")
@@ -84,9 +85,9 @@ def test_plan_json_keeps_every_google_web_surface_primary() -> None:
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert [(row["key"], row["preference"]) for row in payload] == [
-        ("gemini-web", "primary"),
-        ("synthid-web", "primary"),
+    assert [(row["key"], row["preference"], row["url"]) for row in payload] == [
+        ("gemini-web", "primary", "https://gemini.google.com/"),
+        ("synthid-web", "primary", "https://synthid.com/"),
     ]
 
 
@@ -99,6 +100,16 @@ def test_plan_json_marks_web_as_an_explicit_fallback_when_api_exists() -> None:
         ("openai-api", "primary"),
         ("openai-web", "fallback"),
     ]
+
+
+def test_plan_text_tells_the_caller_to_run_the_next_surface() -> None:
+    result = CliRunner().invoke(oracles.cli, ["plan", "openai"])
+
+    assert result.exit_code == 0, result.output
+    assert "primary\topenai-api\tapi\tContent Provenance API" in result.output
+    assert "fallback\topenai-web\tplaywright\tContent Provenance web verifier" in result.output
+    assert "run the next surface as its own command" in result.output
+    assert "separate operator decision" not in result.output
 
 
 def test_slots_support_multiple_accounts_and_networks(tmp_path: Path) -> None:
@@ -140,6 +151,14 @@ def test_slots_support_multiple_accounts_and_networks(tmp_path: Path) -> None:
                         "network_label": "home",
                         "api_key_env": "OPENAI_API_KEY_1",
                     },
+                    {
+                        "name": "synthid-proxy",
+                        "surface": "synthid-web",
+                        "account_label": None,
+                        "browser_profile": None,
+                        "network_label": "thordata",
+                        "proxy_url_env": "THORDATA_PROXY",
+                    },
                 ],
             }
         ),
@@ -153,7 +172,12 @@ def test_slots_support_multiple_accounts_and_networks(tmp_path: Path) -> None:
         "gemini-research",
         "openai-api-1",
         "openai-west",
+        "synthid-proxy",
     }
+    assert slots["synthid-proxy"]["browser_profile"] is None
+    assert slots["synthid-proxy"]["account_label"] is None
+    assert slots["synthid-proxy"]["proxy_url_env"] == "THORDATA_PROXY"
+    assert slots["synthid-proxy"]["google_account_index"] is None
     assert slots["gemini-research"]["account_label"] == "research-b"
     assert slots["gemini-research"]["google_account_index"] == 2
     assert slots["openai-west"]["network_label"] == "west-egress"
@@ -190,6 +214,33 @@ def test_named_slot_uses_repository_local_config_by_default(
 
     assert slot is not None
     assert slot["api_key_env"] == "OPENAI_API_KEY_1"
+
+
+def test_proxy_is_only_for_an_unauthenticated_oracle(tmp_path: Path) -> None:
+    for surface in oracles.SURFACES.values():
+        slot: dict[str, str | int | None] = {
+            "name": "probe",
+            "surface": surface.key,
+            "account_label": "account" if surface.account_slots else None,
+            "browser_profile": "Profile 1" if surface.automation == "real_browser" else None,
+            "network_label": "route",
+            "proxy_url_env": "THORDATA_ROUTE_US",
+        }
+        if surface.key == "gemini-web":
+            slot["google_account_index"] = 0
+        if surface.key == "openai-api":
+            slot["api_key_env"] = "OPENAI_API_KEY_1"
+        config = tmp_path / f"{surface.key}.json"
+        config.write_text(json.dumps({"format_version": 1, "slots": [slot]}), encoding="utf-8")
+
+        if surface.account_slots:
+            with pytest.raises(ValueError, match="does not use proxy_url_env"):
+                oracles.load_slots(config)
+            continue
+
+        loaded = oracles.load_slots(config)
+        assert loaded["probe"]["proxy_url_env"] == "THORDATA_ROUTE_US"
+        assert loaded["probe"]["account_label"] is None
 
 
 def test_slots_override_requires_a_named_slot(tmp_path: Path) -> None:
@@ -278,24 +329,34 @@ def test_slots_override_requires_a_named_slot(tmp_path: Path) -> None:
         ),
         (
             {
-                "name": "synthid-no-profile",
+                "name": "synthid-with-profile",
                 "surface": "synthid-web",
-                "account_label": "personal-a",
-                "browser_profile": None,
+                "account_label": None,
+                "browser_profile": "Profile 2",
                 "network_label": "home",
             },
-            "requires a browser_profile",
+            "only a real-browser surface uses a browser_profile",
         ),
         (
             {
                 "name": "synthid-with-account-index",
                 "surface": "synthid-web",
-                "account_label": "personal-a",
-                "browser_profile": "Profile 2",
+                "account_label": None,
+                "browser_profile": None,
                 "google_account_index": 0,
                 "network_label": "home",
             },
             "only gemini-web uses google_account_index",
+        ),
+        (
+            {
+                "name": "synthid-with-account",
+                "surface": "synthid-web",
+                "account_label": "personal-a",
+                "browser_profile": None,
+                "network_label": "home",
+            },
+            "does not use account slots",
         ),
     ],
 )

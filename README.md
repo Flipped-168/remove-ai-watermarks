@@ -32,6 +32,7 @@ removal.
 [![Tests](https://github.com/wiltodelta/remove-ai-watermarks/actions/workflows/test.yml/badge.svg)](https://github.com/wiltodelta/remove-ai-watermarks/actions/workflows/test.yml)
 [![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-db61a2?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/wiltodelta)
 [![skills.sh](https://skills.sh/b/wiltodelta/remove-ai-watermarks)](https://skills.sh/wiltodelta/remove-ai-watermarks)
+[![Glama MCP server](https://glama.ai/mcp/servers/wiltodelta/remove-ai-watermarks/badges/score.svg)](https://glama.ai/mcp/servers/wiltodelta/remove-ai-watermarks)
 
 > This is a research project on AI provenance signals, for lawful use on content
 > you own. It is provided as is, without warranty or liability, and each user is

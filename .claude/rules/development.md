@@ -29,9 +29,15 @@ The unified maintainer entry point is `scripts/provider_oracles.py`; its workflo
 slot schema live in `docs/provider-oracles.md`. Multi-account and multi-network work
 selects each named slot explicitly from the gitignored repository-local
 `.oracle-slots.json` by default and snapshots it into a separate immutable batch
-manifest. A provider check may use the finite set of configured account slots and surfaces
-after a refusal. Do not add new logins, IP rotation, network-route failover,
-unbounded retries, or cross-session result merging. Never commit the local
+manifest. A provider check walks that provider's existing order: the official API
+surface, then its Web oracle, then the remaining configured account slots.
+After a refusal, quota response, transport error, or indeterminate verdict,
+record the response and continue with the next item as its own command. Do not
+ask for confirmation before the switch. Anyone doing the task may run the
+configured checks. Do not add new logins, IP rotation, or unbounded retries.
+Do not walk a prepared route list or rotate addresses inside one call; the next
+run is a new command and picks a new session. Do not merge results from
+different sessions into one response. Never commit the local
 slot file.
 Every manual result stays bound to the exact sanitized upload hash and preserves the
 provider response verbatim.
@@ -39,38 +45,49 @@ provider response verbatim.
 Provider surface selection is API-first. OpenAI and Microsoft use their official API
 adapters before their Web surfaces when the requested media and local configuration are
 supported. Google and Meta currently use Web because this tooling has no usable API route
-for them. A request to use a provider covers every configured surface, including Web,
-without a second confirmation. An API refusal, quota response, transport error, or
-indeterminate verdict stays on that surface and never silently submits the file to Web.
+for them. Google's Web surfaces are `gemini-web` and `synthid-web`
+(`https://synthid.com/`). After the current surface is exhausted, record the
+response and continue with the next surface as its own command. One call does
+not upload the same file to the next surface, and the verdicts stay separate.
 
-Google Web oracle automation uses only the user's existing authenticated real Chrome
-session. Gemini uses an explicit `/u/N/` account index. The SynthID Detector at
-`https://synthid.com/` (`synthid-web`) uses the same Chrome profile and does not take a
-`/u/N/` index; its terms forbid driving the page as an automated API. OpenAI, Microsoft, and Meta Web automation
-uses isolated Playwright contexts; it must never attach to or copy state from the user's
-real browser. Proxy credentials are read only through a slot's named environment variable
+A signed-in account is required only for `gemini-web`. That surface uses the user's
+existing authenticated real Chrome session and an explicit `/u/N/` account index.
+Every other Web surface, including `synthid-web`, uses an isolated Playwright
+context and may name a proxy. Those contexts must never attach to or copy state
+from the user's real browser. `synthid-web` has no `/u/N/` index. Its terms forbid
+bulk verification and quota evasion, so one run submits the prepared rows once
+and does not start a sign-in. If the page says `Please sign in before detection.`
+and returns no watermark label, keep that row and continue the same prepared
+upload in the user's existing real Chrome. That Chrome session stays on the
+direct route: no proxy, no new login, and no cookie copy into Playwright. If
+that Chrome also asks for sign-in, leave its row unsubmitted. API calls
+stay on the direct SDK transport and do not take `proxy_url_env`. Proxy credentials are read only through a slot's named environment variable
 and never enter a manifest or log. Dotenv interpolation may derive routed proxy URLs from
 one secret key without mutating the process environment. A selected proxy context may
 accept that proxy's TLS interception certificate; direct contexts keep normal TLS checks.
-ThorData rotating endpoints are pinned to one manifest-derived sticky session for the
-life of a Web batch so one browser context does not change exit identity between page
-requests. This is route continuity, not account or IP failover; a refusal still ends on
-the selected slot and never selects another route automatically.
+A ThorData exit is not prepared ahead of time. Each unauthenticated Web run picks
+a new session and a country in Europe or the United States, and keeps that one exit
+for the browser context so page requests do not change identity. A country or
+`sessid` already written into the proxy URL is discarded. The next run picks again.
 Upload readiness is surface-specific: OpenAI reaches it at page load but keeps background
-requests alive, while Microsoft and Meta require network idle. Preserve exact provider
-errors as indeterminate evidence rather than retrying or interpreting them as clean.
+requests alive, while Microsoft, Meta, and SynthID Detector require network idle. Preserve exact provider
+errors as indeterminate evidence, then continue with the next configured route or surface.
 
 OpenAI API slots likewise carry only `api_key_env`. Store multiple key values in the
-gitignored `.env`, select one slot explicitly, and never rotate to another token after a
-refusal or rate limit. The process environment may override the matching `.env` value.
-Their SDK transport sets `trust_env=False`; environment proxy variables must not reroute
-an API check.
+gitignored `.env` and select one slot explicitly. The process environment may override
+the matching `.env` value. Their SDK transport sets `trust_env=False`, so ambient proxy
+variables do not reroute an API check, and the slot does not take `proxy_url_env`.
+After a refusal or rate limit, continue with the next configured slot in a new call,
+then with the Web surface.
 
 Microsoft API slots use the Azure Content Safety and private Blob Storage resource
 identities from the gitignored `.env`. The adapter reads resource keys only into memory
 through authenticated Azure CLI, downloads and hashes the private blob before requiring
-equality with the named local source, keeps `trust_env=False`, never retries the submit,
-and reports Watermark independently from C2PA.
+equality with the named local source, keeps `trust_env=False`, and makes one submit
+inside that call. Ambient proxy settings do not apply, and the slot does not take
+`proxy_url_env`. The next slot or the Web surface is a new call and runs after a
+refusal, quota response, transport error, or indeterminate verdict. Report
+Watermark independently from C2PA.
 
 Do not add an option whose only outcome is an error. Model id, step count and CFG are fixed by the profile, so none of them is a parameter of the CLI, `InvisibleEngine`, or `WatermarkRemover` -- they were accepted-then-rejected for a while, which moved the failure several frames below the caller and advertised choices the pinned stack cannot honor. If a value cannot vary, delete the knob rather than validating it.
 
