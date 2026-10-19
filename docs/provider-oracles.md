@@ -1,9 +1,9 @@
 # Provider oracle tooling
 
 `scripts/provider_oracles.py` is the development-only entry point for the four
-remote watermark-oracle families used by this project. It drives Google through
-the user's real authenticated Chrome and drives the other public Web surfaces
-through isolated Playwright. It keeps provider scope, execution identity,
+remote watermark-oracle families used by this project. It drives Gemini through
+the user's real authenticated Chrome and drives every other public Web surface,
+including SynthID Detector, through isolated Playwright. It keeps provider scope, execution identity,
 immutable media, and verbatim results in one format without exposing any oracle
 through the installed CLI or public Python API.
 
@@ -13,8 +13,8 @@ through the installed CLI or public Python API.
 | --- | --- | --- | --- |
 | `openai-api` | OpenAI SynthID | Official Content Provenance API | Images |
 | `microsoft-api` | Microsoft InvisMark | Azure Content Provenance Detection API | Images |
-| `gemini-web` | Google SynthID | Signed-in Gemini web account | Images and videos |
-| `synthid-web` | Partner SynthID | SynthID Detector at synthid.com, real Chrome | None recorded |
+| `gemini-web` | Google SynthID | User's authenticated Chrome | Images and videos |
+| `synthid-web` | Partner SynthID | Anonymous Playwright page at synthid.com | None recorded |
 | `meta-web` | Meta Content Seal | Anonymous Meta identification page | Images |
 | `microsoft-web` | Microsoft InvisMark | Public Azure AI validation page | Images |
 | `openai-web` | OpenAI SynthID | Public web verifier | Images |
@@ -25,7 +25,7 @@ The default selection order is API first, then Web. OpenAI therefore plans
 `openai-api` before `openai-web`, and Microsoft plans `microsoft-api` before
 `microsoft-web`. Google and Meta currently have no usable API adapter in this
 tooling, so each of their Web surfaces is primary. Google has two: `gemini-web`
-and `synthid-web`.
+and `synthid-web` at `https://synthid.com/`.
 
 Inspect the machine-readable order before preparing a batch:
 
@@ -35,12 +35,15 @@ uv run python scripts/provider_oracles.py plan microsoft
 uv run python scripts/provider_oracles.py plan google
 ```
 
-A request to use a provider covers every configured surface of that provider,
-including Web, without a second confirmation. API-first is still the order to
-try, not a lock on the other surfaces. An API refusal, quota response, transport
-failure, or indeterminate verdict is recorded as-is. It does not silently
-upload the same file to Web; run that surface as its own acknowledged check and
-keep the two verdicts separate.
+API-first is the default order. Run the API surface when this tooling has a
+usable route for the provider, media, and local configuration. Google and Meta
+have no API surface, so each of their Web oracles is primary. For Google that
+is `gemini-web`, then `synthid-web`. After a refusal, quota response, transport
+failure, or indeterminate verdict, record that result and continue with the next
+surface as its own acknowledged command, then the remaining configured account
+slots of those surfaces. One call does not upload the same file to the next
+surface. Keep the verdicts separate. Do not ask for confirmation before the
+switch. Anyone doing the task may run the configured checks.
 
 The old Google SynthID Detector portal at `labs.google/synthid` does not work.
 On 2026-09-07 that entry point redirected a signed-in browser to a Google 404;
@@ -60,10 +63,14 @@ and Kakao, and it did not list Apple. It defined two settled labels:
 `.tif`, `.gif`, `.wav`, `.mp3`, `.ogg`, `.flac`, `.aac`, `.m4a`, `.mp4`,
 `.mov`, and `.webm`. This tooling still prepares only the project's existing
 JPEG, PNG, WebP, MP4, MP3, and WAV suffixes. The portal's additional terms
-forbid using the page as an automated API, bulk verification, and quota evasion,
-so `run-web` does not drive it. Use the real Chrome workflow below. A
-`Watermark detected` result is partner SynthID, not a Gemini-only or OpenAI-only
-verdict.
+forbid bulk verification and quota evasion. `run-web` may submit one prepared
+upload through isolated Playwright, with a proxy when the slot names one, and
+it does not start a sign-in. If the page says `Please sign in before detection.`
+and returns no watermark label, keep that row and open the same prepared upload
+in the user's existing real Chrome. That session stays on the direct route, with
+no proxy and no new login. If that Chrome also asks for sign-in, leave its row
+unsubmitted. A `Watermark detected` result is partner SynthID, not a Gemini-only
+or OpenAI-only verdict.
 Google's newer Search verification entry point did not provide an independent
 oracle allowance in the session tested on 2026-09-13. Lens accepted the
 metadata-stripped, previously Gemini-positive image
@@ -218,43 +225,20 @@ default; `--slots PATH` explicitly overrides it.
       "network_label": "office"
     },
     {
-      "name": "synthid-personal",
+      "name": "synthid-proxy",
       "surface": "synthid-web",
-      "account_label": "google-account-a",
-      "browser_profile": "Your Chrome",
-      "network_label": "home"
+      "account_label": null,
+      "browser_profile": null,
+      "network_label": "thordata",
+      "proxy_url_env": "THORDATA_PROXY"
     },
     {
-      "name": "openai-web-thordata-us",
+      "name": "openai-web-proxy",
       "surface": "openai-web",
       "account_label": null,
       "browser_profile": null,
-      "network_label": "thordata-us-residential",
-      "proxy_url_env": "THORDATA_ROUTE_US"
-    },
-    {
-      "name": "microsoft-web-thordata-de",
-      "surface": "microsoft-web",
-      "account_label": null,
-      "browser_profile": null,
-      "network_label": "thordata-de-residential",
-      "proxy_url_env": "THORDATA_ROUTE_DE"
-    },
-    {
-      "name": "meta-web-thordata-us",
-      "surface": "meta-web",
-      "account_label": null,
-      "browser_profile": null,
-      "network_label": "thordata-us-residential",
-      "proxy_url_env": "THORDATA_ROUTE_US"
-    },
-    {
-      "name": "openai-web-thordata-de",
-      "surface": "openai-web",
-      "account_label": null,
-      "browser_profile": null,
-      "network_label": "thordata-de-residential",
-      "proxy_url_env": "THORDATA_ROUTE_DE"
+      "network_label": "thordata",
+      "proxy_url_env": "THORDATA_PROXY"
     },
     {
       "name": "openai-api-1",
@@ -292,30 +276,34 @@ default; `--slots PATH` explicitly overrides it.
 ```
 
 A routed batch selects one slot explicitly. A Gemini slot must name the Google
-account, its real Chrome profile, and its nonnegative `/u/N/` account index. A
-SynthID Detector slot names the account and the same real Chrome profile, and it
-does not use `google_account_index`. An
-API slot must name its account or project and cannot name a browser profile. The
+account, its real Chrome profile, and its nonnegative `/u/N/` account index. An
+API slot must name its account or project and cannot name a browser profile. A
+Playwright slot for `openai-web`, `microsoft-web`, `meta-web`, or `synthid-web`
+does not name an account or a browser profile. The
 tool records the network route that the operator has already established.
-Non-Google Web slots may name `proxy_url_env`; Playwright reads the secret proxy
-URL from that environment variable without writing or logging it. The tool does
-not merge sessions or automatically change network routes. Account continuation
-is orchestrated by the skill, not by an individual adapter call. A request to
-verify a bounded set of files with a provider covers its configured account slots
-unless the operator restricts the account scope. Identify the finite set of
-available authenticated slots before starting and prepare one immutable batch
-per slot. Record quota refusals as `refused` and service failures according to
-their actual response, leave remaining rows in that slot unsubmitted, and
-continue automatically with the next authorized slot. Do not request permission
-again for files or accounts already covered by the task.
+Those four pages may name `proxy_url_env`; Playwright reads the
+secret proxy URL from that environment variable without writing or logging it.
+The country and session are not part of that preparation. Each run replaces
+them with a new session in a country in Europe or the United States.
+A signed-in account is required only for `gemini-web`. API calls stay on the
+direct SDK transport and do not take `proxy_url_env`. Every other Web surface
+uses isolated Playwright and may use a proxy. The tool does
+not merge sessions inside one adapter call. Account continuation is orchestrated
+by the skill, not by an individual adapter call. A request to verify files with
+a provider covers its configured account slots, surfaces, and network routes.
+Anyone doing the task may run those checks. Identify the finite set of
+configured slots before starting and prepare one immutable batch per slot.
+Record quota refusals as `refused` and service failures according to their
+actual response, leave remaining rows in that slot unsubmitted, and continue
+with the next slot, surface, or configured route. Do not ask for confirmation
+before that switch.
 
-Submit each frozen artifact at most once per slot in that pass. Keep every
+Submit each frozen artifact at most once per slot in one pass. Keep every
 verbatim refusal, inconclusive reply, and disagreement between accounts. Stop
-when the planned checks finish or no authorized usable slot remains, and report
-unsubmitted rows. A new login, another provider, or a new network route needs
-authorization. The oracles and slots already configured for the requested
-provider may be used again, including their Web surfaces, without a second
-confirmation. Candidate pixels remain frozen throughout account continuation.
+when the plan is complete or no configured usable slot, surface, or route
+remains, and report anything still open. Do not start a new login. Each
+submitted artifact stays frozen inside its own batch. Do not change candidate
+pixels during the continuation.
 
 Each `openai-api` slot must name exactly one `api_key_env`. Put the corresponding
 values in the gitignored local `.env`, never in the slot JSON:
@@ -324,29 +312,27 @@ values in the gitignored local `.env`, never in the slot JSON:
 OPENAI_API_KEY_1=replace-with-first-key
 OPENAI_API_KEY_2=replace-with-second-key
 OPENAI_API_KEY_3=replace-with-third-key
-THORDATA_ROUTE_US=http://td-customer-USERNAME-country-US:PASSWORD@HOST.pr.thordata.net:9999
-THORDATA_ROUTE_DE=http://td-customer-USERNAME-country-DE:PASSWORD@HOST.pr.thordata.net:9999
-THORDATA_ROUTE_GB=http://td-customer-USERNAME-country-GB:PASSWORD@HOST.pr.thordata.net:9999
-THORDATA_ROUTE_NL=http://td-customer-USERNAME-country-NL:PASSWORD@HOST.pr.thordata.net:9999
-THORDATA_ROUTE_JP=http://td-customer-USERNAME-country-JP:PASSWORD@HOST.pr.thordata.net:9999
+THORDATA_PROXY=http://td-customer-USERNAME:PASSWORD@HOST.pr.thordata.net:9999
 ```
 
 The tool reads only the variable selected by the requested slot. A nonempty
 process environment value overrides the matching `.env` entry. It never prints
-the value or falls through to another token after authentication, entitlement,
-quota, or transport failure. The no-slot compatibility path reads
+the value. One call reads only its selected slot. After authentication,
+entitlement, quota, or transport failure, continue with the next configured
+slot in a new call. The no-slot compatibility path reads
 `OPENAI_API_KEY`.
 
 Several Google accounts may share one real Chrome profile: give them distinct
 slot names and `google_account_index` values while keeping `browser_profile` the
 same.
 
-The ThorData examples use its [residential proxy country parameter](https://doc.thordata.com/doc/proxies/residential-proxies/location-settings/country-region).
-The proxy username encodes one explicit two-letter ISO country code. Route
-selection remains explicit and never changes after a refusal. OpenAI,
-Microsoft, and Meta Web slots may reuse any route variable; the surface remains
-part of each distinct slot. OpenAI API slots never accept `proxy_url_env` and
-use the current direct network.
+ThorData encodes the exit in the username with its [country parameter](https://doc.thordata.com/doc/proxies/residential-proxies/location-settings/country-region)
+and a [session id](https://doc.thordata.com/doc/proxies/residential-proxies/session-control).
+A stored `country-XX` or `sessid` is not the exit this run will use. The runner
+discards both and appends one new session and one country from Europe or the
+United States. That pair stays for the browser context of the run. The next run
+chooses again, including after a refusal. Gemini and API slots never accept
+`proxy_url_env`. Anonymous Playwright slots may.
 
 Validate and inspect the slots:
 
@@ -419,16 +405,18 @@ uv sync --extra dev
 uv run playwright install chromium
 ```
 
-Google is intentionally excluded from the standalone runner. Both `gemini-web`
-and `synthid-web` use the user's existing real Chrome profile, and the SynthID
-Detector terms forbid driving that page as an automated API. Invoke the project
-`provider-oracles` skill to prepare the batch and record the settled outcome.
-For Gemini, select the named profile and `/u/N/` account. For SynthID Detector,
-open `https://synthid.com/` in that profile. The portal has no `/u/N/` index.
-Accept the terms dialog when it is shown, attach one prepared upload, and read
-the explicit `Watermark detected` or `Watermark not detected` label. If the page
-requires sign-in and that profile has no session, record the row unsubmitted
-and do not start a new login.
+Gemini is the only surface excluded from the standalone runner, because it is
+the only one that requires a signed-in account. Invoke the project
+`provider-oracles` skill to drive that existing Chrome profile at the named
+`/u/N/` account. `synthid-web` is an anonymous page: `run-web` opens
+`https://synthid.com/` in isolated Playwright, attaches one prepared upload
+through the page's file input, and reads the explicit `Watermark detected`,
+`Watermark not detected`, or `SynthID was not detected` label. The portal has
+no `/u/N/` index. If the page says `Please sign in before detection.` and
+returns no watermark label, keep that row and continue the same prepared upload
+in the user's existing real Chrome. That session is direct: no proxy, no new
+login, and no cookie copy into the isolated browser. If that Chrome also asks
+for sign-in, leave its row unsubmitted.
 
 For Gemini, ask the direct question stored in the batch manifest: `Does this
 image/video/audio contain a SynthID watermark? Use the SynthID verification
@@ -437,8 +425,8 @@ general question about whether Google AI created or edited the media is not
 equivalent: it may elicit origin or visual-content reasoning without a SynthID
 verdict. SynthID Detector has no prompt; its settled labels are the verdict.
 
-OpenAI Web, Microsoft Web, and Meta run entirely through a fresh isolated
-Playwright browser. A direct-route example:
+OpenAI Web, Microsoft Web, Meta, and SynthID Detector run through a fresh
+isolated Playwright browser. A direct-route example:
 
 ```bash
 uv run python scripts/provider_oracles.py prepare meta-web input.png \
@@ -449,8 +437,9 @@ uv run python scripts/provider_oracles.py run-web \
   /tmp/meta-check-001/manifest.json --acknowledge-uploads
 ```
 
-For a ThorData-routed OpenAI, Microsoft, or Meta Web slot, keep the generated
-proxy URLs in the gitignored `.env`, then select one route explicitly:
+For an OpenAI, Microsoft, Meta, or SynthID Detector slot that names a ThorData
+credential, keep that URL in the gitignored `.env`. The run chooses the country
+and the session:
 
 ```bash
 uv run python scripts/provider_oracles.py run-web \
@@ -467,12 +456,10 @@ ThorData [user-and-password endpoints without a `sessid` rotate the exit on each
 request](https://doc.thordata.com/doc/proxies/residential-proxies/session-control).
 That is unsuitable inside one browser context: page resources can
 arrive through different exits and trigger the provider's bot checks. For a
-ThorData hostname, the runner derives a non-secret sticky session id from the
-immutable manifest hash and appends a 90-minute session window when the
-configured username has no explicit session. The same batch therefore keeps
-one route while the provider retains it, a new prepared batch gets a distinct
-route, and an operator-supplied `sessid` remains unchanged. This pins a selected
-route; it does not retry or fail over after a refusal.
+ThorData hostname, each run therefore discards a prepared country and session,
+then keeps one new session and one country in Europe or the United States for
+that browser context. The next invocation, including a retry after a refusal,
+chooses again.
 For a selected proxy route it enables certificate handling in that isolated
 Chromium launch and context; direct launches keep Playwright's normal TLS
 verification. A 2026-09-07 preflight sent one read-only request through each
@@ -489,7 +476,7 @@ quota refusal is `refused`, a transport failure is `unreachable`, and unknown or
 changed page wording is `indeterminate`.
 
 Each provider mounts its file input before the upload handler is necessarily
-ready. Microsoft and Meta reach a usable handler at network idle. OpenAI keeps
+ready. Microsoft, Meta, and SynthID Detector reach a usable handler at network idle. OpenAI keeps
 background requests alive and never reaches network idle, so its observable
 readiness seam is the page `load` state instead. The adapter waits for the
 surface-specific state before assigning the file. OpenAI's static FAQ contains

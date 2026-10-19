@@ -579,7 +579,9 @@ provides verification in Gemini and, since the public SynthID Detector opened,
 at [synthid.com](https://synthid.com/). That site is the `synthid-web` oracle
 surface in [`provider-oracles.md`](provider-oracles.md). On 2026-10-17 its FAQ
 named Google DeepMind, Nvidia, OpenAI, and Kakao, and its settled labels were
-`Watermark detected` and `Watermark not detected`. The old limited portal does
+`Watermark detected` and `Watermark not detected`. On 2026-10-19 UTC the
+signed-in page also used the status line `SynthID was not detected`, which this
+tooling records as `not_detected`. The old limited portal does
 not work: on 2026-09-07, its official `labs.google/synthid` entry point
 redirected a signed-in browser to a Google 404. On 2026-09-23 the same entry
 point redirected to `deepmind.google.com/frontiers/synthid`, which also returned

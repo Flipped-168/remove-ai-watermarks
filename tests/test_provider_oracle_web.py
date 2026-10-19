@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import TYPE_CHECKING
 
 import provider_oracle_web as web
@@ -76,6 +77,36 @@ def _thordata_slot() -> oracles.ExecutionSlot:
             "not_detected",
             "unavailable",
         ),
+        (
+            "synthid-web",
+            "Watermark detected",
+            "detected",
+            "unavailable",
+        ),
+        (
+            "synthid-web",
+            "Watermark not detected",
+            "not_detected",
+            "unavailable",
+        ),
+        (
+            "synthid-web",
+            "SynthID was not detected\nIt is unlikely that this media was made with AI from a SynthID partner",
+            "not_detected",
+            "unavailable",
+        ),
+        (
+            "synthid-web",
+            "Please sign in before detection.",
+            "indeterminate",
+            "unavailable",
+        ),
+        (
+            "synthid-web",
+            "Watermark detected\nWatermark not detected",
+            "indeterminate",
+            "unavailable",
+        ),
     ],
 )
 def test_parse_provider_result(
@@ -122,7 +153,12 @@ def test_openai_provider_error_is_a_settled_indeterminate_result() -> None:
 
 @pytest.mark.parametrize(
     ("surface", "ready_state"),
-    [("meta-web", "networkidle"), ("microsoft-web", "networkidle"), ("openai-web", "load")],
+    [
+        ("meta-web", "networkidle"),
+        ("microsoft-web", "networkidle"),
+        ("openai-web", "load"),
+        ("synthid-web", "networkidle"),
+    ],
 )
 def test_react_uploads_wait_for_surface_readiness_before_assigning_the_file(
     tmp_path: Path,
@@ -183,29 +219,44 @@ def test_proxy_settings_are_loaded_from_an_environment_reference() -> None:
     }
 
 
-def test_thordata_proxy_settings_pin_one_exit_for_the_browser_session() -> None:
+def test_thordata_proxy_settings_take_a_fresh_europe_or_us_session() -> None:
     proxy = web.proxy_settings(
         _thordata_slot(),
-        {"THORDATA_ROUTE_US": "http://route:secret@gateway.pr.thordata.net:9999"},
-        sticky_session_id="oracle0123456789abcdef",
+        {
+            "THORDATA_ROUTE_US": "http://td-customer-user-country-JP-sessid-prepared-sesstime-15:secret@gateway.pr.thordata.net:9999"
+        },
+        country="DE",
+        session_id="freshsession01",
     )
 
     assert proxy == {
         "server": "http://gateway.pr.thordata.net:9999",
-        "username": "route-sessid-oracle0123456789abcdef-sesstime-90",
+        "username": "td-customer-user-country-DE-sessid-freshsession01-sesstime-90",
         "password": "secret",
     }
 
 
-def test_thordata_proxy_settings_preserve_an_explicit_session() -> None:
-    proxy = web.proxy_settings(
-        _thordata_slot(),
-        {"THORDATA_ROUTE_US": ("http://route-sessid-manual-sesstime-15:secret@gateway.pr.thordata.net:9999")},
-        sticky_session_id="oracle0123456789abcdef",
-    )
+def test_thordata_proxy_settings_reject_a_country_outside_europe_or_the_us() -> None:
+    assert "US" in web.EUROPE_OR_US_COUNTRIES
+    assert "DE" in web.EUROPE_OR_US_COUNTRIES
+    assert "JP" not in web.EUROPE_OR_US_COUNTRIES
 
-    assert proxy is not None
-    assert proxy["username"] == "route-sessid-manual-sesstime-15"
+    with pytest.raises(ValueError, match="Europe or the US"):
+        web.proxy_settings(
+            _thordata_slot(),
+            {"THORDATA_ROUTE_US": "http://route:secret@gateway.pr.thordata.net:9999"},
+            country="JP",
+            session_id="freshsession01",
+        )
+
+
+def test_new_proxy_session_changes_between_calls() -> None:
+    first = web.new_proxy_session()
+    second = web.new_proxy_session()
+
+    assert first != second
+    assert re.fullmatch(r"[A-Za-z0-9]{1,32}", first)
+    assert re.fullmatch(r"[A-Za-z0-9]{1,32}", second)
 
 
 def test_proxy_settings_do_not_treat_a_missing_secret_as_direct_access() -> None:
@@ -356,6 +407,8 @@ def test_run_web_batch_loads_the_selected_proxy_from_dotenv(
         proxies.append(proxy)
         return [web.WebVerdict("not_detected", "unavailable", "No OpenAI signals detected")]
 
+    monkeypatch.setattr(web, "choose_proxy_country", lambda rng=None: "NL")
+    monkeypatch.setattr(web, "new_proxy_session", lambda: "freshsession01")
     monkeypatch.setattr(web, "_submit_batch", submit)
     report = web.run_web_batch(
         manifest_path,
@@ -367,11 +420,10 @@ def test_run_web_batch_loads_the_selected_proxy_from_dotenv(
     )
 
     assert report["watermark_results"] == {"not_detected": 1}
-    manifest_sha256 = json.loads((manifest_path.parent / "results.json").read_text(encoding="utf-8"))["manifest_sha256"]
     assert proxies == [
         {
             "server": "http://proxy.pr.thordata.net:9999",
-            "username": (f"td-customer-user-country-US-sessid-oracle{manifest_sha256[:16]}-sesstime-90"),
+            "username": "td-customer-user-country-NL-sessid-freshsession01-sesstime-90",
             "password": "test-thordata-password",
         }
     ]
@@ -392,18 +444,31 @@ def test_run_web_batch_requires_explicit_upload_acknowledgement(
         web.run_web_batch(manifest_path, acknowledge_uploads=False)
 
 
-@pytest.mark.parametrize("surface", ["gemini-web", "synthid-web"])
-def test_run_web_batch_refuses_google_real_browser_workflow(
+def test_run_web_batch_refuses_gemini_real_browser_workflow(
     tmp_path: Path,
     tmp_clean_png: Path,
-    surface: str,
 ) -> None:
     manifest_path = oracles.prepare_batch(
-        surface,
+        "gemini-web",
         [tmp_clean_png],
         output_dir=tmp_path / "oracle-batch",
         repository_root=oracles.REPOSITORY_ROOT,
     )
 
     with pytest.raises(ValueError, match="real Chrome"):
+        web.run_web_batch(manifest_path, acknowledge_uploads=True)
+
+
+def test_run_web_batch_requires_a_slot_for_synthid(
+    tmp_path: Path,
+    tmp_clean_png: Path,
+) -> None:
+    manifest_path = oracles.prepare_batch(
+        "synthid-web",
+        [tmp_clean_png],
+        output_dir=tmp_path / "oracle-batch",
+        repository_root=oracles.REPOSITORY_ROOT,
+    )
+
+    with pytest.raises(ValueError, match="explicit execution slot"):
         web.run_web_batch(manifest_path, acknowledge_uploads=True)

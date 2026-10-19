@@ -175,18 +175,18 @@ SURFACES: dict[str, OracleSurface] = {
         provider="Google",
         signal_family="synthid",
         surface="SynthID Detector",
-        automation="real_browser",
+        automation="playwright",
         url="https://synthid.com/",
         media_types=("image", "video", "audio"),
         project_evidence=(),
         prompt=None,
         clean_result_note=(
-            "Record detected only for the explicit label Watermark detected, and not_detected only for "
-            "Watermark not detected. The portal reports partner SynthID from Google DeepMind, Nvidia, "
-            "OpenAI, and Kakao without naming which partner. A not_detected result is not proof of "
-            "human authorship. Preserve quota, sign-in, and unclear wording."
+            "Record detected only for the explicit label Watermark detected, and not_detected for "
+            "Watermark not detected or SynthID was not detected. The portal reports partner SynthID from "
+            "Google DeepMind, Nvidia, OpenAI, and Kakao without naming which partner. A not_detected "
+            "result is not proof of human authorship. Preserve quota, sign-in, and unclear wording."
         ),
-        account_slots=True,
+        account_slots=False,
         network_slots=True,
     ),
     "meta-web": OracleSurface(
@@ -444,6 +444,7 @@ def load_slots(path: Path) -> dict[str, ExecutionSlot]:
             raise ValueError(f"API surface {surface_key} does not use a browser_profile")
         if surface_key not in real_browser and browser_profile is not None:
             raise ValueError("only a real-browser surface uses a browser_profile")
+        # A proxy belongs to Playwright pages. Gemini and API calls stay direct.
         if proxy_url_env is not None and surface_key not in playwright:
             raise ValueError(f"surface {surface_key} does not use proxy_url_env")
         if surface_key == "openai-api" and api_key_env is None:
@@ -894,6 +895,8 @@ def plan(provider: str, as_json: bool) -> None:
         return
     for row in rows:
         click.echo(f"{row['preference']}\t{row['key']}\t{row['automation']}\t{row['surface']}")
+    if len(rows) > 1:
+        click.echo("This command only prints the order. After a failure, run the next surface as its own command.")
 
 
 @cli.command()
@@ -1035,7 +1038,7 @@ def run_web(
     timeout_seconds: float,
     env_file: Path,
 ) -> None:
-    """Submit a prepared non-Google Web batch through isolated Playwright."""
+    """Submit a prepared anonymous Web batch through isolated Playwright."""
     from provider_oracle_web import run_web_batch
 
     report = run_web_batch(
