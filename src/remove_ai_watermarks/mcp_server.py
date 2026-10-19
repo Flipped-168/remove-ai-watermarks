@@ -207,7 +207,11 @@ def call_tool(name: str, arguments: dict[str, Any], runner: Runner = run_cli) ->
         args, output = _COMMANDS[name](_validated(name, arguments))
     except ToolInputError as exc:
         return {"content": [{"type": "text", "text": f"Invalid arguments: {exc}"}], "isError": True}
-    completed = runner(args)
+    try:
+        completed = runner(args)
+    except OSError as exc:  # the child never started, so there is no exit code to relay
+        log.warning("CLI command could not start: %s: %s", args, exc)
+        return {"content": [{"type": "text", "text": f"The command could not start: {exc}"}], "isError": True}
     code = completed.returncode
     text = completed.stdout.strip()
     stderr = completed.stderr.strip()[-4000:]
@@ -219,13 +223,14 @@ def call_tool(name: str, arguments: dict[str, Any], runner: Runner = run_cli) ->
         structured["stdout"] = text
     if stderr:
         structured["stderr"] = stderr
-    # The CLI's own exit 2 means no supported signal, a result. Click also exits 2 on
+    # The CLI's own exit 2 means no supported signal, or a batch directory with nothing
+    # to process, both results. Click also exits 2 on
     # a usage error, such as a missing file, and prints its usage line on stderr.
     no_signal = code == 2 and "Usage:" not in stderr
     is_error = code != 0 and not no_signal
     summary = f"exit code {code}"
     if no_signal:
-        summary += " (no supported signal found; this is unknown, not proof the file is clean)"
+        summary += " (no supported signal found, or nothing to process; this is unknown, not proof of a clean file)"
     body = "\n\n".join(part for part in (summary, text, stderr if is_error else "") if part)
     return {"content": [{"type": "text", "text": body}], "structuredContent": structured, "isError": is_error}
 

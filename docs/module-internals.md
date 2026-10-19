@@ -50,7 +50,28 @@ Important contracts:
   It decodes the source before the scrub gate and exits `1` when it cannot,
   because the gate reads undecodable bytes as "no target" and would otherwise
   report the no-signal code for a file it never read (fixed 2026-10-17).
-- The two no-signal conditions currently share exit code `2`.
+- The two no-signal conditions currently share exit code `2`, and so does a
+  `batch` or `video batch` directory with no supported file, which writes
+  nothing (decided 2026-10-18).
+- An input that is not a readable container exits `1` from `identify`,
+  `metadata` and every `video` command, and fails its row in `batch` and `video
+  batch` (fixed 2026-10-18). The metadata scanners read raw bytes, so random
+  bytes, an empty file or a truncated PNG or MP4 used to print the same "No AI
+  metadata found" or "AI metadata stripped" a real file gets, with exit `0`.
+  `metadata.unreadable_reason` is the one probe: rasters must decode in Pillow or
+  OpenCV, ISOBMFF boxes and EBML elements must tile the file, and a RIFF file must
+  hold its declared size. `strip_and_verify` and `video._video_source` ask it, and
+  `identify` prints its report first, so an AI signal read from a truncated file
+  is still shown. Absent optional detectors are not unreadable input: without the
+  pixel stack `identify` keeps exit `0` and its caveat (decided 2026-10-18).
+  Regression coverage: `tests/test_fail_closed.py`.
+- `visible` and `erase` strip and verify AI metadata on a staged sibling and exit
+  `1` with nothing published when a marker survives; they used to swallow a failed
+  strip unless `--verbose` was set. The library `remove_visible` does the same and
+  raises `MetadataStripIncomplete`, as `remove_all` already did, and the diffusion
+  writer behind `invisible` raises when its own strip leaves a marker.
+  `_internal.utils.staged_sibling` is the shared stage: it never pre-creates the
+  name, so the published file keeps the default permissions.
 - A quiet `metadata --check` and a successful `metadata --remove` (same for
   `video metadata`) end by repeating the `identify` limit: the pixel channel is
   untouched and a watermark such as SynthID has no local decoder once its
@@ -241,7 +262,8 @@ as `workflow` and `prompt` uses the same structural walk; removal blanks the
 complete key and value in place. This preserves every box size,
 `stco`/`co64` offset, encoded stream byte apart from the Kling SEI tag below, and
 source-sized memory bound.
-Publication is atomic, and a malformed top-level walk is copied unchanged. A
+Publication is atomic, and a malformed top-level walk is copied unchanged,
+although `strip_and_verify` refuses such a source before the stripper runs. A
 generic `AIGC` key whose value has no TC260 field is ignored.
 
 The in-memory image path (AVIF, HEIF, JPEG-XL and unknown suffixes, through
@@ -829,7 +851,7 @@ Key contracts:
   written output for surviving markers. If the metadata-preserving decoder
   rejected the container but `image_io` can still decode its raster,
   `strip_and_verify` normalizes that raster and scans again. A truly undecodable
-  file keeps the surviving-marker result.
+  file raises `ValueError` before anything is written.
 
 Detection and removal must stay in parity. A new marker is incomplete until the
 scanner can find it, the remover can reach every supported placement, and a

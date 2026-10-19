@@ -217,9 +217,12 @@ class WatermarkRemover:
         bgr = np.ascontiguousarray(np.asarray(image.convert("RGB"))[:, :, ::-1])
         if not image_io.imwrite(str(output_path), bgr, display_tags_from=display_tags_from):
             image.save(output_path)
-        from remove_ai_watermarks.metadata import remove_ai_metadata
+        from remove_ai_watermarks.metadata import strip_and_verify
 
-        remove_ai_metadata(output_path, output_path, keep_standard=True)
+        # Verified, so a marker that survives fails the run instead of shipping with it.
+        _, leftover = strip_and_verify(output_path, output_path, keep_standard=True)
+        if leftover:
+            raise RuntimeError(f"AI metadata survived the strip: {', '.join(sorted(leftover))}")
 
     def remove_watermark(
         self,

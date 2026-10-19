@@ -340,17 +340,20 @@ class TestHasAiMetadata:
         assert after is not None
         assert np.array_equal(after, before)
 
-    def test_strip_and_verify_reports_markers_in_undecodable_copy_through(self, tmp_path: Path):
-        """A truly undecodable file keeps the established fail-safe result."""
+    def test_strip_and_verify_refuses_an_undecodable_file(self, tmp_path: Path):
+        """A truly undecodable file raises before anything is written.
+
+        It used to be copied through and reported with its surviving markers, but a
+        copy-through of bytes no scanner can parse may carry nothing a re-scan sees,
+        and then it verified as a real strip (`tests/test_fail_closed.py`).
+        """
         src = _corrupt_c2pa_png(tmp_path / "source.png")
         src.write_bytes(src.read_bytes()[: src.stat().st_size // 2])
         out = tmp_path / "copy.png"
 
-        result, remaining = strip_and_verify(src, out)
-
-        assert result == out
-        assert "c2pa_manifest" in remaining
-        assert out.read_bytes() == src.read_bytes()
+        with pytest.raises(ValueError, match=r"cannot read source\.png"):
+            strip_and_verify(src, out)
+        assert not out.exists()
 
 
 class TestC2paMarkerIn:

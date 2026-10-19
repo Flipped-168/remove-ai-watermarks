@@ -705,8 +705,9 @@ the tool contract are in the [MCP server guide](mcp-server.md).
 
 The CLI uses nonzero exit codes for meaningful incomplete outcomes, including
 no detected target on commands that would otherwise regenerate or create a
-misleading unchanged result, processing errors, and a required invisible step
-that could not run.
+misleading unchanged result, a batch directory with nothing to process,
+processing errors, an input that is not a readable image or video, and a
+required invisible step that could not run.
 
 Scripts should check the process exit code and the output path. The detailed
 per-command contract is maintained in

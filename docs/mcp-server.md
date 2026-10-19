@@ -58,7 +58,10 @@ writes over an input: an `output` equal to the source, or an `output_dir` equal
 to the input directory, is refused before anything runs.
 
 Exit codes keep their CLI meaning. `0` and `2` are results, not tool errors, and
-`2` means no supported signal was found, which is unknown rather than clean.
+`2` means no supported signal was found, or a `batch` directory held nothing to
+process, which is unknown rather than clean. An
+input that is not a readable image or video exits `1`, so `identify` on it is a
+tool error even though the command still printed a report.
 Click also exits `2` on a usage error such as a missing file; its `Usage:` line on
 stderr marks that case as a tool error. Every other nonzero exit code is returned
 with `isError: true` and the command's stderr.

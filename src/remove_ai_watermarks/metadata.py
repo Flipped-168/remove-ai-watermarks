@@ -1856,6 +1856,92 @@ def _sniff_image_format(head: bytes) -> str | None:
     return None
 
 
+_JXL_CONTAINER_MAGIC = b"\x00\x00\x00\x0cJXL \r\n\x87\n"
+# Accepted on their magic alone: no local parser walks them, and the ffmpeg strip path
+# fails on its own when one is unreadable. JPEG XL codestream, FLV, ID3, FLAC, Ogg.
+_MAGIC_ONLY: tuple[bytes, ...] = (b"\xff\x0a", b"FLV", b"ID3", b"fLaC", b"OggS")
+_PILLOW_RASTERS = frozenset({"png", "jpeg", "webp", "gif", "bmp", "tiff"})
+
+
+def _tiling_reason(kind: str, ends: Iterable[int], size: int) -> str | None:
+    """None when the last top-level element ends at EOF; a truncation leaves a gap."""
+    end = max(ends, default=0)  # top-level end offsets only increase
+    if end == size:
+        return None
+    return f"the {kind} structure stops at byte {end} of {size} (truncated or corrupt)"
+
+
+def _pixel_stack_decodes(path: Path) -> bool:
+    """Whether the optional pixel stack decodes ``path``; False when it is absent."""
+    from remove_ai_watermarks.optional_deps import pixels_available
+
+    if not pixels_available():
+        return False
+    from remove_ai_watermarks import image_io
+
+    return image_io.imread(path) is not None
+
+
+@functools.lru_cache(maxsize=8)
+def _unreadable_reason_cached(path_str: str, _mtime_ns: int, size: int) -> str | None:
+    from pathlib import Path as _Path
+
+    from PIL import Image
+
+    from remove_ai_watermarks._internal.ebml import EBML_MAGIC, iter_top_level_ends
+    from remove_ai_watermarks._internal.isobmff import iter_file_boxes
+    from remove_ai_watermarks.forensic_metadata import sniff_format
+
+    path = _Path(path_str)
+    if size == 0:
+        return "the file is empty"
+    with path.open("rb") as stream:
+        head = stream.read(32)
+        kind = sniff_format(head)
+        if kind.startswith("isobmff:") or head.startswith(_JXL_CONTAINER_MAGIC):
+            return _tiling_reason("ISOBMFF box", (end for _s, end, _t, _p in iter_file_boxes(stream, 0, size)), size)
+        if head.startswith(EBML_MAGIC):
+            return _tiling_reason("EBML element", iter_top_level_ends(stream, size), size)
+    if kind in _PILLOW_RASTERS:
+        try:
+            with Image.open(path) as image:
+                image.load()
+        except Image.DecompressionBombError:
+            return None  # readable, merely too large for a precautionary full decode
+        except Exception as exc:
+            # The pixel stack decodes some rasters Pillow rejects (a PNG with a bad eXIf
+            # CRC), and strip_and_verify recovers those through it, so they are readable.
+            return None if _pixel_stack_decodes(path) else f"the image cannot be decoded: {exc}"
+        return None
+    if head.startswith(b"RIFF") and len(head) >= 8:
+        declared = 8 + struct.unpack_from("<I", head, 4)[0]
+        return None if declared <= size else f"the RIFF header declares {declared} bytes but the file has {size}"
+    mpeg_audio_sync = len(head) > 1 and head[0] == 0xFF and head[1] & 0xE0 == 0xE0
+    if head.startswith(_MAGIC_ONLY) or mpeg_audio_sync:
+        return None
+    return "the content is not a recognized image, video or audio container"
+
+
+def unreadable_reason(path: Path) -> str | None:
+    """Why ``path`` is not a readable image, video or audio container, or None.
+
+    The metadata scanners read raw bytes, so on a file that is not a container at all
+    they find nothing and say so, which is the same answer a real file without metadata
+    gets. Callers that report "no metadata" or "stripped" ask this first, so an
+    unreadable input fails instead of reading as clean. Rasters must fully decode in
+    Pillow or, when it is installed, the pixel stack; ISOBMFF boxes and EBML elements
+    must tile the file, which is what a truncation breaks; a RIFF file must hold its
+    declared size. The formats in ``_MAGIC_ONLY`` and MPEG audio frames have no local
+    walker and pass on their magic. Memoized on (path, mtime, size): one command asks
+    several times about the same input.
+    """
+    try:
+        stat = path.stat()
+        return _unreadable_reason_cached(str(path), stat.st_mtime_ns, stat.st_size)
+    except OSError as exc:
+        return f"cannot be read: {exc}"
+
+
 def strip_and_verify(
     source_path: Path,
     output_path: Path | None = None,
@@ -1866,10 +1952,12 @@ def strip_and_verify(
 
     :func:`remove_ai_metadata` is deliberately fail-safe: a file PIL cannot decode is
     copied through UNCHANGED rather than crashing a caller, and the path it returns is
-    indistinguishable from a real strip. Any caller that reports an outcome to a user
-    therefore cannot tell a no-op from a success. A Samsung C2PA compatibility case
-    exposed this when `metadata --remove` reported success while the output still read
-    as AI.
+    indistinguishable from a real strip. This wrapper is what a caller reporting an
+    outcome uses instead: it refuses a source :func:`unreadable_reason` rejects with
+    ``ValueError`` before writing anything, because a copy-through of bytes nothing can
+    parse may carry no marker a re-scan sees, and then re-scans what it wrote. A
+    Samsung C2PA compatibility case exposed the original gap when `metadata --remove`
+    reported success while the output still read as AI.
 
     If markers survive but OpenCV can still decode the raster, the verified path
     normalizes the container through :mod:`image_io` and scans once more. This
@@ -1878,6 +1966,8 @@ def strip_and_verify(
 
     Returns ``(output_path, surviving_markers)``; an empty mapping means a real strip.
     """
+    if (reason := unreadable_reason(source_path)) is not None:
+        raise ValueError(f"cannot read {source_path.name}: {reason}")
     out = remove_ai_metadata(source_path, output_path, keep_standard=keep_standard)
     remaining = get_ai_metadata(out)
     if not remaining:
