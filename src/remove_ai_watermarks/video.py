@@ -32,7 +32,6 @@ _EBML_VIDEO_EXTENSIONS: frozenset[str] = frozenset({".webm", ".mkv"})
 _RIFF_VIDEO_EXTENSIONS: frozenset[str] = frozenset({".avi"})
 _FLV_VIDEO_EXTENSIONS: frozenset[str] = frozenset({".flv"})
 _REGENERATED_VIDEO_EXTENSIONS: frozenset[str] = _ISOBMFF_VIDEO_EXTENSIONS
-_EBML_MAGIC = b"\x1aE\xdf\xa3"
 
 
 def _require_video_runtime() -> None:
@@ -237,17 +236,23 @@ def _video_source(source: str | Path) -> Path:
     if path.suffix.lower() not in VIDEO_EXTENSIONS:
         supported = ", ".join(sorted(VIDEO_EXTENSIONS))
         raise ValueError(f"Unsupported video format {path.suffix or '<none>'}; expected one of: {supported}")
+    from remove_ai_watermarks._internal.ebml import EBML_MAGIC
+
     with path.open("rb") as stream:
         head = stream.read(12)
     suffix = path.suffix.lower()
     matches_container = (
         (suffix in _ISOBMFF_VIDEO_EXTENSIONS and len(head) >= 8 and head[4:8] == b"ftyp")
-        or (suffix in _EBML_VIDEO_EXTENSIONS and head.startswith(_EBML_MAGIC))
+        or (suffix in _EBML_VIDEO_EXTENSIONS and head.startswith(EBML_MAGIC))
         or (suffix in _RIFF_VIDEO_EXTENSIONS and len(head) >= 12 and head[:4] == b"RIFF" and head[8:12] == b"AVI ")
         or (suffix in _FLV_VIDEO_EXTENSIONS and head.startswith(b"FLV"))
     )
     if not matches_container:
         raise ValueError(f"Video content does not match its {suffix} extension: {path}")
+    from remove_ai_watermarks.metadata import unreadable_reason
+
+    if (reason := unreadable_reason(path)) is not None:
+        raise ValueError(f"Cannot read video {path}: {reason}")
     return path
 
 
@@ -714,13 +719,13 @@ def remove_video_batch(
     )
     if output_path.resolve() == directory_path.resolve():
         raise ValueError("Video batch output directory must differ from the source directory")
-    output_path.mkdir(parents=True, exist_ok=True)
-
     sources = tuple(
         path
         for path in sorted(directory_path.iterdir(), key=lambda candidate: candidate.name.lower())
         if path.is_file() and path.suffix.lower() in VIDEO_EXTENSIONS
     )
+    if sources:
+        output_path.mkdir(parents=True, exist_ok=True)
     items: list[VideoBatchItem] = []
     invisible_runtime: VideoVaeRuntime | None = None
     invisible_runtime_error: str | None = None

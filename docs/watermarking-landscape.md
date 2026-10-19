@@ -139,8 +139,8 @@ against primary sources before adding jurisdiction-specific claims.
 is added to generated images and videos "to further help you identify AI-generated
 content", and AI Pro and Ultra subscribers can turn it off. That makes it an
 AI-generation label under the [project scope](legal-and-safety.md#out-of-scope). No
-template is registered, because no publication-cleared export has been captured;
-slide decks export as PDF or PPTX, which the project does not process.
+template is planned (decided 2026-10-18), so the mark stays undetected; slide
+decks export as PDF or PPTX, which the project does not process.
 
 **Google Veo video marks use two incompatible visible designs.** Public raw
 clips verify the current four-point diamond and the legacy bottom-right `Veo`

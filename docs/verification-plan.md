@@ -92,8 +92,8 @@ the row count is host-dependent rather than the fixed 68 recorded here before. E
 (~500 images spanning format x provenance x aspect ratio), asserting exit-code semantics
 rather than just absence of crash.
 
-Known trap to encode: **exit 2 is triply overloaded** (no-visible-mark, no-invisible-signal,
-Click usage error). A wrapper cannot distinguish them without parsing stderr. Either the
+Known trap to encode: **exit 2 is overloaded four ways** (no-visible-mark, no-invisible-signal,
+empty batch directory, Click usage error). A wrapper cannot distinguish them without parsing stderr. Either the
 sweep asserts on stderr, or the codes get split -- the latter is the better fix.
 
 #### Coverage method

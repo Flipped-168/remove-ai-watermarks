@@ -347,7 +347,7 @@ def test_missing_pixel_stack_names_the_extra_instead_of_a_traceback(
     source = tmp_path / "image.png"
     source.write_bytes((ROOT / "data" / "fixtures" / "provenance" / "chatgpt-1.png").read_bytes())
     clip = tmp_path / "clip.mp4"
-    clip.write_bytes(b"\x00\x00\x00\x18ftypmp42")
+    clip.write_bytes(b"\x00\x00\x00\x10ftypmp42\x00\x00\x00\x00")  # one whole box, so the input reads
     substitutions = {
         "SOURCE": str(source),
         "CLIP": str(clip),

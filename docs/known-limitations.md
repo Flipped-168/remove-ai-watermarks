@@ -621,8 +621,9 @@ stream safely.
 raising. User facing callers must use `strip_and_verify` and inspect its
 surviving marker mapping before reporting success. `strip_and_verify` recovers
 when `image_io` can still decode the raster by normalizing the container and
-checking again. A truly undecodable file still reports the surviving markers.
-The CLI uses this verified path.
+checking again. A truly undecodable file raises `ValueError` before anything is
+written (since 2026-10-18; it used to be copied through with its surviving
+markers). The CLI uses this verified path.
 
 ### Sixteen bit PNG metadata stripping
 
