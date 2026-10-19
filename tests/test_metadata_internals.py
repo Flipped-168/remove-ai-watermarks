@@ -595,11 +595,11 @@ class TestISOBMFF:
         assert not is_isobmff(b"abc")
 
     def test_strips_jpegxl_jumb_box(self):
-        """JPEG-XL stores JUMBF in a ``jumb`` box, always stripped."""
+        """JPEG-XL stores JUMBF in a ``jumb`` box, always blanked to ``free``."""
         jumb = struct.pack(">I", 8 + 5) + b"jumb" + b"hello"
         cleaned, stripped = strip_c2pa_boxes(FTYP + jumb)
         assert stripped == 1
-        assert cleaned == FTYP
+        assert cleaned == FTYP + struct.pack(">I", 8 + 5) + b"free" + bytes(5)
 
     def test_keeps_non_c2pa_box_with_64bit_size(self):
         """size==1 means a 64-bit largesize follows; non-C2PA box is kept."""

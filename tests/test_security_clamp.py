@@ -117,7 +117,7 @@ class TestIsobmffStripFailSafe:
 
         cleaned, stripped = isobmff.strip_c2pa_boxes(data)
         assert stripped == 1
-        assert len(cleaned) == len(data) - len(c2pa_box)
+        assert len(cleaned) == len(data)
         assert isobmff.C2PA_UUID not in cleaned
 
     def test_malformed_box_does_not_truncate_tail(self):

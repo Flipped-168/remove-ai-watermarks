@@ -244,6 +244,13 @@ source-sized memory bound.
 Publication is atomic, and a malformed top-level walk is copied unchanged. A
 generic `AIGC` key whose value has no TC260 field is ignored.
 
+The in-memory image path (AVIF, HEIF, JPEG-XL and unknown suffixes, through
+`strip_c2pa_boxes`) blanks the same top-level boxes to same-size `free` boxes.
+It used to drop them, which moved `mdat` under an unchanged `iloc`: a phone HEIC
+whose C2PA `uuid` box preceded `mdat` came out undecodable (2026-10-13).
+`tests/test_metadata.py::TestIsobmffStripKeepsOffsets` decodes a cleaned HEIC to
+guard it.
+
 App-export JSON in a keyed or keyless metadata item is blanked the same way.
 Dreamina's MP4 export writes it twice, under `LvMetaInfo` and
 `com.apple.quicktime.artwork`. The file-level scan read both from the raw head
