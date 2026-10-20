@@ -736,10 +736,17 @@ def strip_isobmff_media_file(
     return len(targets), len(tc260_key_spans | ai_metadata_key_spans | app_key_spans) + bool(kling_sei_offsets)
 
 
-def strip_c2pa_boxes(data: bytes) -> tuple[bytes, int]:
-    """Return ``(cleaned_bytes, stripped_count)`` with AI-provenance boxes removed.
+def _blank_box(data: bytes, start: int, end: int, payload_off: int) -> bytes:
+    """Return ``data[start:end]`` as a ``free`` box of the same length and size
+    encoding, with its payload zeroed, so no later file offset moves."""
+    return data[start : start + 4] + b"free" + data[start + 8 : payload_off] + bytes(end - payload_off)
 
-    Walks top-level boxes and drops:
+
+def strip_c2pa_boxes(data: bytes) -> tuple[bytes, int]:
+    """Return ``(cleaned_bytes, stripped_count)`` with AI-provenance boxes blanked.
+
+    Walks top-level boxes and turns each of these into a same-length ``free`` box
+    with a zeroed payload:
     - any ``uuid`` box whose UUID equals ``C2PA_UUID`` (a C2PA manifest);
     - any ``uuid`` box whose payload carries an AI-label marker (an XMP packet
       with a TC260 / IPTC / IPTC-2025.1 AI field -- caught by content, not by the
@@ -747,10 +754,15 @@ def strip_c2pa_boxes(data: bytes) -> tuple[bytes, int]:
       non-AI XMP intact);
     - any ``jumb`` box (JPEG-XL JUMBF container).
 
-    All other boxes (incl. ``mdat`` / codestream) are emitted verbatim, so pixel
-    and audio data is preserved bit-for-bit. Non-ISOBMFF input is returned
+    The box is blanked rather than dropped because HEIF ``iloc`` and MP4
+    ``stco``/``co64`` locate the coded data by absolute file offset: dropping a
+    box that precedes ``mdat`` moved the image without rewriting them, and a
+    phone HEIC cleaned that way no longer decoded (2026-10-13). This matches
+    :func:`strip_isobmff_media_file`. All other boxes (incl. ``mdat`` /
+    codestream) are emitted verbatim, so pixel and audio data is preserved
+    bit-for-bit. Non-ISOBMFF input is returned
     unchanged. Despite the name this also covers MP4/MOV/M4A video and audio
-    (all ISOBMFF). NOTE: this drops only top-level boxes. AI metadata stored as an
+    (all ISOBMFF). NOTE: this blanks only top-level boxes. AI metadata stored as an
     *item inside the ``meta`` box* (typical for AVIF/HEIF) is handled separately and
     in place (same length, no offset rewrite): AI-label XMP by
     :func:`blank_ai_xmp_packets`, and AI-generator tokens in an ``Exif`` item by
@@ -764,17 +776,16 @@ def strip_c2pa_boxes(data: bytes) -> tuple[bytes, int]:
     consumed = 0
     for start, end, box_type, payload_off in _iter_top_level_boxes(data):
         consumed = end
+        provenance = box_type == b"jumb"
         if box_type == b"uuid":
             # uuid boxes carry the 16-byte UUID immediately after the type.
             is_c2pa = payload_off + 16 <= end and data[payload_off : payload_off + 16] == C2PA_UUID
-            has_ai_label = any(marker in data[payload_off:end] for marker in _AI_LABEL_MARKERS)
-            if is_c2pa or has_ai_label:
-                stripped += 1
-                continue
-        elif box_type == b"jumb":
+            provenance = is_c2pa or any(marker in data[payload_off:end] for marker in _AI_LABEL_MARKERS)
+        if provenance:
             stripped += 1
-            continue
-        out.extend(data[start:end])
+            out.extend(_blank_box(data, start, end, payload_off))
+        else:
+            out.extend(data[start:end])
 
     # Fail-safe: the walker returns early on a malformed box (bad size, or a box
     # that runs past EOF), so anything after it was never visited. Emitting `out`

@@ -17,7 +17,7 @@ description: Command contracts, project gate, typing boundaries, model-adjacent 
 
 Every single-image command declares `source` with `dir_okay=False`; `batch` declares its directory with `file_okay=False`. Keep `tests/test_cli_robustness.py::TestDirectoryInputIsRejected` as the regression guard.
 
-Exit-code and no-signal behavior is a public contract. Read the command-line section of [`../../docs/module-internals.md`](../../docs/module-internals.md) before changing it. Keep [`../../skills/remove-ai-watermarks/`](../../skills/remove-ai-watermarks/) in the same change when command routing, extras, exit codes, mark keys, or the intended-use boundary move.
+Exit-code and no-signal behavior is a public contract. Read the command-line section of [`../../docs/module-internals.md`](../../docs/module-internals.md) before changing it. The dev `.venv` always carries the pixel stack, so it cannot show what the default install does. To check a no-signal or fail-closed change there, build a throwaway venv outside the repository (`uv venv /tmp/bare && VIRTUAL_ENV=/tmp/bare uv pip install .`) and run `/tmp/bare/bin/remove-ai-watermarks` against it. Keep [`../../skills/remove-ai-watermarks/`](../../skills/remove-ai-watermarks/) in the same change when command routing, extras, exit codes, mark keys, or the intended-use boundary move.
 
 `tests/test_agent_skill.py` enforces that by comparing the skill's prose against the live Click tree. Guard the SET, not the instances: per-flag comparisons only check what the skill already documents, so `--vendor`, `--pipeline auto` and then the whole `classify` and `verify-openai-synthid` commands each shipped with a green suite. `test_every_cli_command_is_named_somewhere_in_the_skill` closes that; raise `MIN_CLI_VERSION` in the skill's probe whenever a reference names a command, flag or value the previous release lacked, or the probe tells an agent its CLI is current right before it types something that build rejects.
 
@@ -109,7 +109,7 @@ procedure in `docs/development.md`; do not revive the old text-matching bypass.
 
 Boundary modules for cv2, Torch, and Diffusers may carry narrow per-file relaxations for unknown third-party types. Keep pure-logic files strict, preserve the local piexif stub, and fix real errors before widening a pragma.
 
-From a worktree, `uv run` imports the package from the MAIN checkout -- that is where the editable install points. A script measuring a worktree's edit must insert that worktree's `src` at `sys.path[0]` and assert `module.__file__` resolves inside it, or it silently compares unmodified code against itself.
+From a worktree without its own `.venv`, `uv run` imports the package from the MAIN checkout, because that is where the editable install points; a worktree with its own `.venv` imports its own `src`. Either way, a script measuring a worktree's edit must assert `module.__file__` resolves inside that worktree (insert its `src` at `sys.path[0]` when it does not), or it silently compares unmodified code against itself.
 
 ## Research harnesses stay out of this repository
 

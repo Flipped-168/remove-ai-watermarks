@@ -150,8 +150,8 @@ commands above directly.
 | Code | Meaning |
 | --- | --- |
 | 0 | Requested work completed |
-| 2 | No targeted signal (`visible` / no-signal `invisible`) |
-| 1 | Hard failure, or `all` skipped a required invisible stage |
+| 2 | No targeted signal (`visible` / no-signal `invisible`), or a `batch` directory with no supported file |
+| 1 | Hard failure, an input that is not a readable image or video (`identify` and `metadata` included), or `all` skipped a required invisible stage |
 
 A written file plus exit `1` from `all` is a partial result.
 

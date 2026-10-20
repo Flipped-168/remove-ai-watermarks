@@ -675,10 +675,7 @@ class TestAllCommand:
             # The no-signal gate lives in the library now; patch it there, not on the
             # CLI module, or the diffusion stage runs for real.
             patch("remove_ai_watermarks.api._SourceEvidence.has_invisible_target", return_value=False),
-            patch(
-                "remove_ai_watermarks.metadata.strip_and_verify",
-                return_value=(tmp_path / "intermediate.png", {"c2pa": True}),
-            ),
+            patch("remove_ai_watermarks.metadata.strip_written_output", return_value={"c2pa": "survived"}),
         ):
             result = runner.invoke(main, ["all", str(sample_png), "-o", str(output)])
 
@@ -867,7 +864,7 @@ class TestBatchCommand:
         empty_dir = tmp_path / "empty"
         empty_dir.mkdir()
         result = runner.invoke(main, ["batch", str(empty_dir)])
-        assert result.exit_code == 0
+        assert result.exit_code == 2  # nothing processed is the no-signal code (2026-10-18)
         assert "No supported images" in result.output
 
     def test_batch_visible_mode(self, runner, tmp_path):
@@ -1309,10 +1306,10 @@ def test_visible_backend_runtime_error_exits_cleanly(runner, tmp_path, monkeypat
 @pytest.mark.parametrize("cmd", [["metadata", "--remove"], ["visible", "--backend", "cv2"]])
 def test_unreadable_input_exits_cleanly(runner, tmp_path, name, content, cmd):
     """Regression: a corrupt / empty / non-image file (real prod uploads include ~0.2%
-    truncated files) must NEVER leak a raw PIL/OSError/ValueError traceback. `metadata
-    --remove` is fail-safe -- an undecodable file is copied through unchanged (exit 0),
-    a strip that cannot parse the file is a no-op, not a crash; `visible` must decode to
-    remove a mark, so it is a clean error (exit 1). Found by the runtime mode fuzz."""
+    truncated files) must NEVER leak a raw PIL/OSError/ValueError traceback, and both
+    commands fail with a clean exit 1. `metadata --remove` used to copy the bytes
+    through and exit 0, which read as a completed strip; since 2026-10-18 it writes
+    nothing (`tests/test_fail_closed.py`). Found by the runtime mode fuzz."""
     bad = tmp_path / name
     bad.write_bytes(content)
     out = tmp_path / "out.png"
@@ -1320,12 +1317,9 @@ def test_unreadable_input_exits_cleanly(runner, tmp_path, name, content, cmd):
     assert result.exception is None or isinstance(result.exception, SystemExit), (
         f"leaked a raw traceback: {result.exception!r}"
     )
-    if cmd[0] == "metadata":
-        assert result.exit_code == 0, result.output  # fail-safe copy-through
-        assert out.read_bytes() == content  # input passed through unchanged
-    else:
-        assert result.exit_code == 1, result.output  # cannot remove a mark from unreadable input
-        assert "Error" in result.output
+    assert result.exit_code == 1, result.output
+    assert "Error" in result.output
+    assert not out.exists()
 
 
 @pytest.mark.parametrize(

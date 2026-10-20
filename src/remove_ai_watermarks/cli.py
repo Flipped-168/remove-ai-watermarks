@@ -125,6 +125,27 @@ def _validate_image(path: Path) -> Path:
     return path
 
 
+def _unreadable_input_exit(source: Path, *, after_report: bool, to_stderr: bool = False) -> None:
+    """Exit 1 when ``source`` is not a readable container; return otherwise.
+
+    The metadata scanners read raw bytes, so on bytes that are not an image or video
+    they find nothing, and "nothing" used to print as the same no-signal answer a
+    real file gets, with exit 0. ``after_report`` says whether a partial report was
+    already printed above. ``to_stderr`` keeps a ``--json`` stdout parseable.
+    """
+    from remove_ai_watermarks.metadata import unreadable_reason
+
+    if (reason := unreadable_reason(source)) is None:
+        return
+    scanned = "The scan above is incomplete" if after_report else "Nothing was scanned"
+    message = f"Error: cannot read {source.name}: {reason}. {scanned}, not a no-signal result."
+    if to_stderr:
+        click.echo(message, err=True)
+    else:
+        console.print(f"  {message}")
+    raise SystemExit(1)
+
+
 def _resolved_strength_for_display(
     source: Path,
     strength: float | None,
@@ -427,6 +448,8 @@ def _write_output_or_exit(
     bgr: NDArray[Any],
     alpha: NDArray[Any] | None,
     display_source: Path | None = None,
+    *,
+    strip_metadata: bool = False,
 ) -> None:
     """Write the final image, or fail with a readable error instead of a traceback.
 
@@ -438,11 +461,29 @@ def _write_output_or_exit(
     Regression: `tests/test_cli_robustness.py::TestFailedWriteIsReported`.
 
     `display_source` is the file whose decode produced `bgr`; its ICC profile and EXIF
-    orientation ride along into the re-encoded output (issue #98)."""
+    orientation ride along into the re-encoded output (issue #98).
+
+    ``strip_metadata`` strips and verifies AI metadata on a staged copy before it is
+    published, so a marker that survives exits 1 with nothing written. Both commands
+    using this used to swallow a failed strip unless ``--verbose`` was set."""
+    from remove_ai_watermarks._internal.utils import staged_sibling
+    from remove_ai_watermarks.metadata import strip_written_output
+
     output.parent.mkdir(parents=True, exist_ok=True)
-    if not image_io.write_bgr_with_alpha(output, bgr, alpha, display_tags_from=display_source):
-        console.print(f"  Error: failed to write output (is the destination writable?): {output}")
-        raise SystemExit(1)
+    with staged_sibling(output) as staged:
+        if not image_io.write_bgr_with_alpha(staged, bgr, alpha, display_tags_from=display_source):
+            console.print(f"  Error: failed to write output (is the destination writable?): {output}")
+            raise SystemExit(1)
+        if not strip_metadata:
+            return
+        try:
+            leftover = strip_written_output(staged)
+        except (OSError, RuntimeError, ValueError) as e:
+            console.print(f"  Error: failed to strip AI metadata from {output}: {e}")
+            raise SystemExit(1) from e
+        if leftover:
+            console.print(f"  Error: AI metadata survived in {output}: {', '.join(sorted(leftover))}")
+            raise SystemExit(1)
 
 
 def _no_visible_mark_exit(source: Path) -> NoReturn:
@@ -510,6 +551,10 @@ def _no_visible_mark_exit(source: Path) -> NoReturn:
 # no invisible watermark was locally detectable", so it can surface the message
 # instead of treating an unchanged image as a completed removal.
 EXIT_NO_INVISIBLE_SIGNAL = 2
+
+# Also 2: a batch directory with no supported file processed nothing, which is a
+# no-signal outcome a wrapper must not read as a cleaned directory.
+EXIT_NOTHING_PROCESSED = EXIT_NO_INVISIBLE_SIGNAL
 
 
 def _no_invisible_signal_exit(source: Path) -> NoReturn:
@@ -636,7 +681,6 @@ def _run_visible_auto(
 
 
 def _run_visible_explicit(
-    ctx: click.Context,
     source: Path,
     output: Path,
     *,
@@ -685,15 +729,7 @@ def _run_visible_explicit(
         raise SystemExit(1) from e
     elapsed = time.monotonic() - t0
 
-    _write_output_or_exit(output, result, alpha, display_source=source)
-    if strip_metadata:
-        try:
-            from remove_ai_watermarks.metadata import remove_ai_metadata
-
-            remove_ai_metadata(output, output)
-        except Exception as e:
-            if ctx.obj.get("verbose"):
-                console.print(f"  Warning: Failed to strip metadata: {e}")
+    _write_output_or_exit(output, result, alpha, display_source=source, strip_metadata=strip_metadata)
 
     size_kb = output.stat().st_size / 1024
     console.print(f"  Saved: {output}  ({size_kb:.0f} KB, {elapsed:.2f}s)")
@@ -713,10 +749,8 @@ def _run_visible_explicit(
 @_visible_backend_option
 @_visible_sensitivity_option
 @click.option("--strip-metadata/--keep-metadata", default=True, help="Strip AI metadata from output.")
-@click.pass_context
 @_pixels_required
 def cmd_visible(
-    ctx: click.Context,
     source: Path,
     output: Path | None,
     detect: bool,
@@ -754,7 +788,6 @@ def cmd_visible(
         return
 
     _run_visible_explicit(
-        ctx,
         source,
         output,
         detect=detect,
@@ -795,10 +828,8 @@ def _parse_region(spec: str) -> tuple[int, int, int, int]:
 @click.option("--inpaint-method", type=click.Choice(["telea", "ns"]), default="telea", help="cv2 inpaint method.")
 @click.option("--dilate", type=int, default=3, help="Grow the box by this many px before inpainting.")
 @click.option("--strip-metadata/--keep-metadata", default=True, help="Strip AI metadata from output.")
-@click.pass_context
 @_pixels_required
 def cmd_erase(
-    ctx: click.Context,
     source: Path,
     regions: tuple[str, ...],
     output: Path | None,
@@ -839,16 +870,7 @@ def cmd_erase(
         raise SystemExit(1) from e
     elapsed = time.monotonic() - t0
 
-    _write_output_or_exit(output, result, alpha, display_source=source)
-
-    if strip_metadata:
-        try:
-            from remove_ai_watermarks.metadata import remove_ai_metadata
-
-            remove_ai_metadata(output, output)
-        except Exception as e:
-            if ctx.obj.get("verbose"):
-                console.print(f"  Warning: Failed to strip metadata: {e}")
+    _write_output_or_exit(output, result, alpha, display_source=source, strip_metadata=strip_metadata)
 
     size_kb = output.stat().st_size / 1024
     console.print(f"  Erased {len(boxes)} region(s) -> {output}  ({size_kb:.0f} KB, {elapsed:.2f}s)")
@@ -937,13 +959,17 @@ def cmd_invisible(
     def progress_cb(msg: str) -> None:
         console.print(f"  {msg}")
 
-    engine = InvisibleEngine(
-        pipeline=pipeline,
-        hf_token=hf_token,
-        progress_callback=progress_cb,
-        controlnet_conditioning_scale=controlnet_scale,
-        cpu_offload=cpu_offload,
-    )
+    try:
+        engine = InvisibleEngine(
+            pipeline=pipeline,
+            hf_token=hf_token,
+            progress_callback=progress_cb,
+            controlnet_conditioning_scale=controlnet_scale,
+            cpu_offload=cpu_offload,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:  # e.g. no CUDA device
+        console.print(f"  Error: {exc}")
+        raise SystemExit(1) from exc
 
     # Detect the SynthID vendor from the ORIGINAL (before processing strips C2PA) so the
     # displayed and executed strength agree on the vendor-adaptive default. An explicit
@@ -1052,6 +1078,7 @@ def cmd_metadata(
     # accepts video/audio containers, so the image-format warning would misfire.
     # click's `exists=True` on the argument already enforces the file exists.
     _banner()
+    _unreadable_input_exit(source, after_report=False)
 
     if check or (not remove):
         has_ai = has_ai_metadata(source)
@@ -1064,14 +1091,13 @@ def cmd_metadata(
     # Remove
     try:
         out, leftover = strip_and_verify(source, output, keep_standard=keep_standard)
-    except (OSError, ValueError) as e:  # unreadable / truncated / non-image (PIL raises OSError subclasses)
+    except (OSError, RuntimeError, ValueError) as e:  # unreadable input, or ffmpeg absent or failing
         console.print(f"  Error: cannot process {source.name}: {e}")
         raise SystemExit(1) from e
 
     if leftover:
         console.print(f"  FAILED: {len(leftover)} AI metadata marker(s) survived in {out}")
         console.print(f"    still present: {', '.join(sorted(leftover))}")
-        console.print("    the file could not be decoded, so it was copied through unchanged")
         raise SystemExit(1)
     console.print(f"  AI metadata stripped -> {out}")
     _print_metadata_not_a_clean_verdict()
@@ -1440,6 +1466,9 @@ def cmd_video_batch(
     except (OSError, RuntimeError, ValueError) as e:
         raise click.ClickException(str(e)) from e
 
+    if not result.items:
+        console.print(f"  No supported videos found in {directory}; nothing was processed")
+        raise SystemExit(EXIT_NOTHING_PROCESSED)
     for item in result.items:
         if item.error is not None:
             console.print(f"  FAILED {item.source.name}: {item.error}")
@@ -1488,6 +1517,7 @@ def cmd_identify(ctx: click.Context, source: Path, no_visible: bool, as_json: bo
 
     if as_json:
         click.echo(json.dumps(asdict(report), default=str, indent=2))
+        _unreadable_input_exit(source, after_report=True, to_stderr=True)
         return
 
     _banner()
@@ -1534,6 +1564,7 @@ def cmd_identify(ctx: click.Context, source: Path, no_visible: bool, as_json: bo
         console.print("\n  Caveats:")
         for c in report.caveats:
             console.print(f"  - {c}")
+    _unreadable_input_exit(source, after_report=True)
 
 
 # ── Metadata-free photo classification (opt-in, never a tail of identify) ──
@@ -1824,13 +1855,15 @@ def cmd_batch(
 
     if output_dir is None:
         output_dir = directory.parent / (directory.name + "_clean")
-    output_dir.mkdir(parents=True, exist_ok=True)
 
     images = sorted(p for p in directory.iterdir() if is_supported_format(p))
 
     if not images:
-        console.print(f"No supported images found in {directory}")
-        return
+        # Nothing processed is the no-signal code, not success: a wrapper must not read
+        # an empty run as a cleaned directory.
+        console.print(f"No supported images found in {directory}; nothing was processed")
+        raise SystemExit(EXIT_NOTHING_PROCESSED)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     console.print(f"  Found {len(images)} images in {directory}")
     console.print(f"  Output -> {output_dir}")
@@ -1859,6 +1892,11 @@ def cmd_batch(
         if ctx.obj.get("verbose"):
             console.print(f"  {img.name}: {stage}{f' {detail}' if detail else ''}")
 
+    try:
+        engine = _batch_engine(mode, invisible_options)
+    except (OSError, RuntimeError, ValueError) as e:  # e.g. no CUDA device
+        console.print(f"  Error: {e}")
+        raise SystemExit(1) from e
     summary = api_remove_batch(
         directory,
         output_dir,
@@ -1867,7 +1905,7 @@ def cmd_batch(
         sensitivity=_parse_sensitivity(sensitivity),
         invisible=invisible_options,
         force=force,
-        engine=_batch_engine(mode, invisible_options),
+        engine=engine,
         progress=on_progress,
     )
 

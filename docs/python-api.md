@@ -79,7 +79,8 @@ For a path input, `remove_visible` and `remove_visible_detailed`:
 - reads metadata provenance for the default `auto` sensitivity;
 - preserves a separate alpha channel;
 - writes the output when an output path is supplied;
-- strips AI metadata from the written output by default;
+- strips AI metadata from the written output by default, and raises
+  `MetadataStripIncomplete` without publishing it when a marker survives;
 - preserves the original bytes for a same-format no-op copy.
 
 ```python
@@ -226,8 +227,9 @@ The complete field set, with the shipped defaults:
 and not to this table, because this seam had already drifted by eight fields
 before anything checked it.
 
-If AI metadata survives the strip, `remove_all` raises `MetadataStripIncomplete`
-**before** writing anything: an AI-readable output is worse than no output.
+If AI metadata survives the strip, `remove_all` and a path-input `remove_visible`
+raise `MetadataStripIncomplete` **before** publishing anything: an AI-readable
+output is worse than no output.
 
 `remove_batch` runs one mode over a directory and never lets a single bad file
 end the run:
@@ -525,7 +527,9 @@ It checks the written output and returns `(output_path, surviving_markers)`.
 When the first strip leaves markers in a malformed but raster-decodable image,
 it normalizes the container through `image_io` and checks again. That recovery
 path preserves the pixels but drops standard metadata. Treat a nonempty
-`surviving_markers` mapping as a failure.
+`surviving_markers` mapping as a failure. A source that is not a readable image,
+video or audio container raises `ValueError` before anything is written;
+`metadata.unreadable_reason(path)` returns the same reason without stripping.
 
 `remove_ai_metadata` is the lower level fail-safe transformer. It may copy an
 undecodable input through unchanged, so its return alone must not be presented

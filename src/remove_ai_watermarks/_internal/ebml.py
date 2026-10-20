@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 from remove_ai_watermarks.metadata import MAX_TC260_VALUE_BYTES, parse_tc260_aigc_json
 
-_EBML_MAGIC = b"\x1aE\xdf\xa3"
+EBML_MAGIC = b"\x1aE\xdf\xa3"
 _SEGMENT_ID = 0x18538067
 _TAGS_ID = 0x1254C367
 _TAG_ID = 0x7373
@@ -95,6 +95,16 @@ def _iter_elements(
         pos = element_end
 
 
+def iter_top_level_ends(stream: BinaryIO, size: int) -> Iterator[int]:
+    """End offset of each valid top-level element; stops early where a header fails.
+
+    An element whose declared size runs past ``size`` fails its header, so a truncated
+    file yields a last end short of ``size``. An unknown-size Segment runs to ``size``.
+    """
+    for _element_id, _payload_start, element_end in _iter_elements(stream, 0, size):
+        yield element_end
+
+
 def _read_bounded(
     stream: BinaryIO,
     start: int,
@@ -133,7 +143,7 @@ def tc260_aigc_payloads(path: str | Path) -> tuple[bytes, ...]:
     found: list[bytes] = []
     try:
         with open(path, "rb") as stream:
-            if stream.read(4) != _EBML_MAGIC:
+            if stream.read(4) != EBML_MAGIC:
                 return ()
             stream.seek(0, 2)
             file_size = stream.tell()

@@ -22,7 +22,7 @@ from the provider's canonical name, the provider is named separately.
 | --- | --- | --- | --- |
 | `samsung_en_alpha.png` | Samsung Galaxy AI label, English locale ("AI-generated content", bottom-left) | 5 corpus files | POS 0.11-0.30 vs NEG max 0.40 (binary); tophat/gray tried, no separation. The registered Italian engine scores 0.18-0.31 on the same files -- same layout class, wrong glyph template. |
 | `gemini_text_alpha.png` | "Generated with Gemini" text label (bottom-right; the registered gemini mark is the sparkle icon) | 3 corpus files | POS 0.07-0.22 vs NEG max 0.32; coverage gate finds the blob (0.29-0.35) but the Arial silhouette misses Google's letterforms. |
-| `notebooklm_alpha.png` | NotebookLM wordmark (bottom-right) | 12 corpus files | locate geometry not yet fitted; POS max 0.12. |
+| `notebooklm_alpha.png` | NotebookLM wordmark (bottom-right; the product is now Gemini Notebook) | 12 corpus files | parked: a template is not planned (decided 2026-10-18). Last measured POS max 0.12, locate geometry never fitted. |
 | `mindvideo_alpha.png` | MindVideo.AI (top-right) | 11 corpus files | POS 0.29-0.32 vs NEG max 0.30 -- borderline overlap, not shippable. |
 | `higgsfield_alpha.png` | `HIGGSFIELD AI` wordmark (Higgsfield AI, bottom-right; the boxed `AI` variant shares the cohort) | 5 wordmark files (16 in the boxed-AI OCR cluster) | POS max 0.26 vs NEG max 0.22 -- no separation; the mark may be two-part (wordmark + boxed AI) and needs a composed template. |
 | `jianying_alpha.png` | `剪映AI` wordmark (Jianying / 剪映, the China product in the CapCut family; bottom-right) | 2 corpus files | POS 0.29 vs NEG max 0.35. |

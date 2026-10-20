@@ -185,7 +185,7 @@ def test_only_failures_are_tool_errors(returncode: int, stderr: str, is_error: b
 
     assert result["isError"] is is_error
     assert result["structuredContent"]["exit_code"] == returncode
-    assert ("not proof the file is clean" in result["content"][0]["text"]) is (returncode == 2 and not is_error)
+    assert ("not proof of a clean file" in result["content"][0]["text"]) is (returncode == 2 and not is_error)
     if is_error:
         assert stderr.splitlines()[-1] in result["content"][0]["text"]
 

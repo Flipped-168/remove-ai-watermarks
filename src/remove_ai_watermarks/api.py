@@ -132,33 +132,35 @@ def _write_visible_result(
     if not removed and not write_noop:
         return
 
+    import shutil
+
     from remove_ai_watermarks import image_io
+    from remove_ai_watermarks._internal.utils import staged_sibling
 
     out_path = Path(output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     source_path = loaded.path
-    if not removed and source_path is not None and source_path.suffix.lower() == out_path.suffix.lower():
-        # Copy the ORIGINAL bytes instead of lossily re-encoding a no-op. An in-place
-        # call needs no copy and would otherwise raise shutil.SameFileError.
-        if source_path.resolve() != out_path.resolve():
-            import shutil
-
-            shutil.copyfile(source_path, out_path)
-    else:
+    # Staged, so a strip that leaves AI metadata behind publishes nothing -- the
+    # MetadataStripIncomplete contract.
+    with staged_sibling(out_path) as staged:
+        if not removed and source_path is not None and source_path.suffix.lower() == out_path.suffix.lower():
+            # Copy the ORIGINAL bytes instead of lossily re-encoding a no-op.
+            shutil.copyfile(source_path, staged)
         # imwrite is contractually NON-RAISING, so this bool is the only signal the file
         # was not created. Unchecked, the metadata strip below ran on a nonexistent path
         # and surfaced as a confusing "cannot read image <INPUT>" naming the OUTPUT path
         # (Tier E, 2026-07-20). Raise here so a library caller and the CLI both get an
         # accurate message about the write.
-        if not image_io.write_bgr_with_alpha(
-            out_path, result, loaded.alpha, display_tags_from=source_path, orientation_applied=False
+        elif not image_io.write_bgr_with_alpha(
+            staged, result, loaded.alpha, display_tags_from=source_path, orientation_applied=False
         ):
             raise OSError(f"failed to write output (is the destination writable?): {out_path}")
 
-    if strip_metadata:
-        from remove_ai_watermarks import metadata
+        if strip_metadata:
+            from remove_ai_watermarks.metadata import strip_written_output
 
-        metadata.remove_ai_metadata(out_path, out_path)
+            if leftover := strip_written_output(staged):
+                raise MetadataStripIncomplete(set(leftover))
 
 
 def remove_visible(
@@ -461,7 +463,7 @@ def remove_all(
     import tempfile
 
     from remove_ai_watermarks import image_io, watermark_registry
-    from remove_ai_watermarks.metadata import strip_and_verify
+    from remove_ai_watermarks.metadata import strip_written_output
 
     def say(stage: str, detail: str) -> None:
         if progress is not None:
@@ -516,8 +518,7 @@ def remove_all(
         # ── 3. AI metadata ──
         # Read the pristine ORIGINAL for provenance above and the STAGED file here:
         # the visible pass has already dropped this file's C2PA.
-        _, leftover = strip_and_verify(staged, staged)
-        if leftover:
+        if leftover := strip_written_output(staged):
             # Before the write, on purpose -- see MetadataStripIncomplete.
             raise MetadataStripIncomplete(set(leftover))
         say("metadata", "stripped")
@@ -676,7 +677,9 @@ def remove_batch(
     from remove_ai_watermarks.optional_deps import pixels_available
 
     src_dir, out_dir = Path(directory), Path(output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    sources = sorted(p for p in src_dir.iterdir() if is_supported_format(p))
+    if sources:  # an empty run leaves no empty output directory behind
+        out_dir.mkdir(parents=True, exist_ok=True)
 
     def say(path: Path, stage: str, detail: str) -> None:
         if progress is not None:
@@ -685,7 +688,7 @@ def remove_batch(
     unavailable: list[Path] = []
     errors: list[tuple[Path, str]] = []
     items: list[BatchItemResult] = []
-    for img_path in sorted(p for p in src_dir.iterdir() if is_supported_format(p)):
+    for img_path in sources:
         out_path = out_dir / img_path.name
         try:
             result = _run_batch_one(img_path, out_path, mode, backend, sensitivity, invisible, force, engine, say)

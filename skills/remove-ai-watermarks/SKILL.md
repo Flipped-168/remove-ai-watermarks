@@ -157,8 +157,8 @@ Read the process exit code and whether `-o` exists.
 | Exit | Meaning | What to tell the user |
 | --- | --- | --- |
 | 0 | Requested work completed | The output path. Do not add "this is clean". |
-| 2 | No targeted signal | Unknown, not clean. No new file from `visible`. |
-| 1 | Error or partial `all` | Quote the error. Say which stage ran, if any. |
+| 2 | No targeted signal, or a `batch` directory with no supported file | Unknown, not clean. No new file from `visible`. |
+| 1 | Error, unreadable input, or partial `all` | Quote the error. Say which stage ran, if any. |
 
 Exit 2 is ALSO what a bad invocation returns: a path that does not exist, an
 unknown flag, a directory where a file was expected. Read the output before
@@ -167,7 +167,9 @@ means the command never ran, so fix it and rerun; only a command that reached
 the image can say "no targeted signal".
 
 `identify` with no signal reports origin unknown. Never rephrase that as "no
-watermark" or "this is clean".
+watermark" or "this is clean". When `identify` or `metadata` exits 1 with
+`cannot read`, the file is damaged or not an image or video: any report above
+that line is incomplete, so say the file could not be read.
 
 `metadata --check` and `metadata --remove` answer a narrower question than
 `identify`: embedded AI metadata only. Both print that this is not a clean
