@@ -19,7 +19,7 @@ Every single-image command declares `source` with `dir_okay=False`; `batch` decl
 
 Exit-code and no-signal behavior is a public contract. Read the command-line section of [`../../docs/module-internals.md`](../../docs/module-internals.md) before changing it. The dev `.venv` always carries the pixel stack, so it cannot show what the default install does. To check a no-signal or fail-closed change there, build a throwaway venv outside the repository (`uv venv /tmp/bare && VIRTUAL_ENV=/tmp/bare uv pip install .`) and run `/tmp/bare/bin/remove-ai-watermarks` against it. Keep [`../../skills/remove-ai-watermarks/`](../../skills/remove-ai-watermarks/) in the same change when command routing, extras, exit codes, mark keys, or the intended-use boundary move.
 
-`tests/test_agent_skill.py` enforces that by comparing the skill's prose against the live Click tree. Guard the SET, not the instances: per-flag comparisons only check what the skill already documents, so `--vendor`, `--pipeline auto` and then the whole `classify` and `verify-openai-synthid` commands each shipped with a green suite. `test_every_cli_command_is_named_somewhere_in_the_skill` closes that; raise `MIN_CLI_VERSION` in the skill's probe whenever a reference names a command, flag or value the previous release lacked, or the probe tells an agent its CLI is current right before it types something that build rejects.
+`tests/test_agent_skill.py` enforces that by comparing the skill's prose against the live Click tree, and `test_every_cli_command_is_named_somewhere_in_the_skill` covers the whole command set, because per-flag comparisons let `--vendor`, `--pipeline auto`, `classify` and `verify-openai-synthid` ship undocumented with a green suite. Raise `MIN_CLI_VERSION` in the skill's probe whenever a reference names a command, flag or value the previous release lacked, or the probe tells an agent its CLI is current right before it types something that build rejects.
 
 Provider verification services and provenance APIs are development-only oracles. Keep
 their SDKs in the development extra and their adapters out of the installed CLI,
@@ -32,9 +32,10 @@ selects each named slot explicitly from the gitignored repository-local
 manifest. A provider check walks that provider's existing order: the official API
 surface, then its Web oracle, then the remaining configured account slots.
 After a refusal, quota response, transport error, or indeterminate verdict,
-record the response and continue with the next item as its own command. Do not
-ask for confirmation before the switch. Anyone doing the task may run the
-configured checks. Do not add new logins, IP rotation, or unbounded retries.
+record the response and continue with the next item as its own command.
+Deviation from the global rules: do not ask for confirmation before the switch,
+because anyone doing the task holds standing permission to run the configured
+checks. Do not add new logins, IP rotation, or unbounded retries.
 Do not walk a prepared route list or rotate addresses inside one call; the next
 run is a new command and picks a new session. Do not merge results from
 different sessions into one response. Never commit the local
@@ -62,7 +63,7 @@ upload in the user's existing real Chrome. That Chrome session stays on the
 direct route: no proxy, no new login, and no cookie copy into Playwright. If
 that Chrome also asks for sign-in, leave its row unsubmitted. API calls
 stay on the direct SDK transport and do not take `proxy_url_env`. Proxy credentials are read only through a slot's named environment variable
-and never enter a manifest or log. Dotenv interpolation may derive routed proxy URLs from
+and never enter a manifest. Dotenv interpolation may derive routed proxy URLs from
 one secret key without mutating the process environment. A selected proxy context may
 accept that proxy's TLS interception certificate; direct contexts keep normal TLS checks.
 A ThorData exit is not prepared ahead of time. Each unauthenticated Web run picks
@@ -99,7 +100,7 @@ The same rule applies to install hints: name the extra that actually makes the c
 
 Run `bash maintain.sh` from the repository root. The authoritative type gate is scoped to `src/`; full-project Pyright can exhaust Node memory on the ML dependency graph.
 
-The full gate outlasts the agent's 10-minute foreground shell cap, which kills it mid-suite. Run it detached under `nohup caffeinate -dimu` with its exit code written to a file and poll that file. To stop a stray run, kill its own PID, never `pkill -f pytest`, which also takes down other sessions' suites on the machine.
+The full gate outlasts the agent's 10-minute foreground shell cap, which kills it mid-suite, so run it detached with its exit code written to a file and poll that file. To stop a stray run, kill its own PID, never `pkill -f pytest`, which also takes down other sessions' suites on the machine.
 
 The security scanner's exit status is authoritative, including a failure after a success
 message. `tests/test_maintenance.py` checks clean, vulnerable, and broken scanner
@@ -137,9 +138,8 @@ silhouettes. When the generator fails after a geometry or gate change, fix the g
 (and the engine) together; do not hand-edit the binaries.
 
 Visible-mark content must distinguish the registry key, the provider's canonical
-product name, and the literal text rendered in the mark whenever those differ. Verify
-external provider names against the provider's official source rather than inferring
-them from an asset filename or OCR text.
+product name (from the provider's official source, never an asset filename or OCR
+text), and the literal text rendered in the mark whenever those differ.
 
 ## Model-adjacent tests
 
@@ -162,20 +162,17 @@ Do not classify an entire module as untestable because its main path downloads a
   and artifact hash are immutable, the pickle-free schema and exact GELU are
   validated, threshold mutation changes the real decision, and `identify`
   never consumes the result as watermark evidence.
-- the `InvisibleOptions` defaults, in `test_api.py`. When one signature promises to
-  mirror another, compare them field by field rather than pinning the values you happen
-  to know about, so the next field added on one side and not the other fails at the
-  seam. Two of these defaults drifted in practice and neither needed a GPU to catch;
-  the incident is recorded in `docs/module-internals.md`. Keep the comparison free of
-  an exception table: a field that needs one is a field that belongs elsewhere, which
-  is what `force` turned out to be.
+- the `InvisibleOptions` defaults, in `test_api.py`, compared field by field with the
+  signature they mirror. Two of these defaults drifted in practice and neither needed a
+  GPU to catch; the incident is recorded in `docs/module-internals.md`. Keep the
+  comparison free of an exception table: a field that needs one is a field that belongs
+  elsewhere, which is what `force` turned out to be.
 
-A defaults comparison is not a forwarding test, and the two fail differently. Pin the
-VALUE at the seam, not just the name -- `_run_invisible` passed the whole suite with
-`controlnet_conditioning_scale` hardcoded, because nothing asserted the caller's value
-arrived. `test_every_field_arrives_at_the_engine_with_the_caller_s_value` drives the
-real seam with every field set off its default, so one test covers the whole bag
-instead of one assertion per knob.
+Deviation from the global rules: reaching the real seam is not enough here; one
+forwarding test sets every `InvisibleOptions` field off its default and asserts each
+VALUE arrives (`test_every_field_arrives_at_the_engine_with_the_caller_s_value`),
+because `_run_invisible` passed the whole suite with `controlnet_conditioning_scale`
+hardcoded. A defaults comparison does not replace it.
 
 Count the seams before believing a knob is covered. Each of `force` and
 `controlnet_conditioning_scale` reaches the engine through TWO paths -- `remove_all`
@@ -192,10 +189,9 @@ A verdict branch must be reachable with the dependency stack as shipped. High-co
 C2PA attribution required `signingCredential.trusted`, a code the reader emits only when a
 trust anchor list is loaded, and none ships -- so the branch was dead in production for
 every vendor while a hand-built info dict stamping that code kept it green from 0.27.0
-through 0.30.0. Assert reachability against the committed fixtures rather than a synthesized
-status set; `TestIdentifyRealSamples::test_no_committed_fixture_reports_a_trusted_signer`
-is that guard. Read a capability the stack does not have as a missing input, never as a
-negative finding.
+through 0.30.0. `TestIdentifyRealSamples::test_no_committed_fixture_reports_a_trusted_signer`
+asserts reachability against the committed fixtures. Read a capability the stack does not have
+as a missing input, never as a negative finding.
 
 ## The docs are a seam, and they drift like one
 
@@ -208,11 +204,9 @@ code-to-docs seam was not, so it drifted exactly the way an unguarded seam does:
 `--tile-overlap` or `--unsharp`, and `docs/python-api.md` named 9 of the 16
 option fields.
 
-Group option spellings by the Click PARAMETER, never by string surgery on the
-names. A boolean pair can be spelled anything -- `--strip-metadata/--keep-metadata`,
-`--keep-standard/--remove-all` -- so deriving the partner from a `--no-` prefix
-silently splits those pairs and demands both halves. Either spelling documents
-the pair.
+Group option spellings by the Click parameter, never by a `--no-` prefix: pairs
+such as `--strip-metadata/--keep-metadata` and `--keep-standard/--remove-all` are
+documented by either spelling.
 
 ## One measurement, one gate seam
 
@@ -262,9 +256,8 @@ is `peak % 36 > 18.0` and for uint8 input the exact Haar value is a multiple of 
 lands ON the threshold once per 72 blocks and a 1-ulp difference flips real bits: leave the
 transform to `pywt` however slow it looks, because its C convolution contracts into an FMA
 that numpy has no ufunc for (`docs/module-internals.md` carries what that costs). And
-`tests/test_invisible_watermark.py` is `skipif(not is_available())` -- without the `detect`
-extra the upstream-parity test never runs, so a green suite is not evidence here and the
-verdict record is not optional.
+`tests/test_invisible_watermark.py` skips the upstream-parity test without the `detect`
+extra (`skipif(not is_available())`), so the verdict record is required here.
 
 ## A certified operating point is data, not a constant
 
@@ -285,19 +278,14 @@ path exempt from the gate it exists to feed, which is exactly backwards.
 Prove a video-path refactor the same way the detection path is proven, and without
 needing an oracle carrier: build a clip from a tracked fixture with ffmpeg, run the
 engine before and after, and require an identical output sha256. Keep the generated
-media outside the repository. Bind that comparison to one synced environment: a
-full-extras `uv sync` was observed to change re-encoded H.264 packet bytes with
-no code change while every detection stayed identical
-(`docs/audio-provenance-experiment.md`), so a moved video hash across an
-environment change is not by itself a regression signal.
+media outside the repository. Run both arms in one synced environment: a
+full-extras `uv sync` changed re-encoded H.264 packet bytes with no code change
+while every detection stayed identical (`docs/audio-provenance-experiment.md`).
 
-Frame sampling is compared as `timestamp + 1e-9 >= next_sample_time`, so mutating
-that `>=` to `>` changes nothing and a green suite proves nothing. Mutate the phase
-or the period instead -- starting the accumulator half a period late shifts the
-selection by one frame while keeping the count identical, which is the drift a
-frame-count check cannot see and what
-`test_pairing_follows_the_engine_sampling_rule_not_just_the_frame_count` exists to
-catch.
+Frame sampling compares `timestamp + 1e-9 >= next_sample_time`, so a `>=`-to-`>`
+mutant survives; mutate the phase or the period instead (starting the accumulator
+half a period late shifts the selection by one frame at an identical count), the drift
+`test_pairing_follows_the_engine_sampling_rule_not_just_the_frame_count` catches.
 
 Environment setup, dependency recovery, CI behavior, and fixture policy: [`../../docs/development.md`](../../docs/development.md).
 
@@ -312,8 +300,7 @@ must map every input stream before atomically publishing the output.
 
 Research observations must describe the decoded, hash-bound saved artifact.
 Keep period selection independent of confirmation patches, require explicit
-negative evidence, and deduplicate source corpora by content identity rather
-than detector-score equality. Use the metric's actual denominator in its name;
+negative evidence. Use the metric's actual denominator in its name;
 normalized edit distance is not reference-normalized character error rate.
 
 Tests that reload a module after changing environment variables must restore
