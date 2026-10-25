@@ -213,19 +213,43 @@ Waveform-shell splits, 2026-08-23, s1, 25 s gap,
 | 90° Fourier sector of 16-32 | 27.5 | detected |
 | Radial-phase-only 16-32 | 25.0 | not_detected |
 
-## External literature (surveyed 2026-08-23)
+## External literature (surveyed through 2026-10-19)
 
 Primary sources. Detector papers live in
 [detector research](synthid-detector-research.md). Forensic stealth of
 regeneration is already in [synthid.md](synthid.md#23-removal-attacks-and-forensic-detectability).
 
+This survey used 12 broad bibliographic queries across arXiv, OpenReview,
+conference proceedings, provider publications, and linked code repositories.
+The arXiv harvest alone produced 443 unique records; 160 attack-, removal-,
+forgery-, and robustness-related title/abstract candidates were screened, and
+22 central papers were read from full text. The search covered classical
+watermark attacks, post-hoc and in-generation AI watermarks, black-, beige-,
+and white-box threat models, benchmarks, removal forensics, and code-release
+status. It excluded text-watermark attacks except where a theorem explicitly
+claims to apply across modalities. This is an engineering evidence map, not a
+claim of exhaustive bibliographic completeness.
+
+The broad answer is clear: image-watermark removal is a mature adversarial
+research problem, and the literature repeatedly breaks open schemes. The much
+narrower result needed here remains absent. No primary source found in this
+sweep demonstrates a no-box attack on current production OpenAI or Google
+SynthID at native 1024 px that both reliably clears the official verifier and
+preserves roughly 40 dB PSNR / 0.99 SSIM. Results on an open decoder, an
+external SynthID variant, a local surrogate, a resized input, or semantic
+regeneration do not establish that result.
+
 | Source | Attack | Against SynthID? | Map to this campaign |
 | --- | --- | --- | --- |
+| Gowal et al., [SynthID-Image](https://arxiv.org/abs/2510.09263) | Documents the production threat model and evaluates the external 512 x 512 SynthID-O variant against common transformations and weak VAE regeneration | The paper says production SynthID has marked more than ten billion images and frames, but publishes experimental results for SynthID-O, not the deployed model | Authoritative evidence that the production system is post-hoc, proprietary, adversarially trained, and explicitly hardened against weak VAE regeneration; it is not a public production benchmark |
 | Zhao et al., [arXiv:2306.01953](https://arxiv.org/abs/2306.01953) (NeurIPS 2024) | Add noise, then denoise or regenerate (VAE / diffusion). Pixel-level invisible marks are provably removable. Semantic watermarks proposed as the alternative | Open post-hoc schemes, not production SynthID | This is the family our product uses (`qwen-zimage` / `sdxl-zimage`). Gowal trains SynthID-O against *weak* VAE regeneration. Our foreign-VAE round-trip at 22.3 dB stayed `detected`. Regeneration works when it redraws, not when it is a light codec |
 | Liu et al., [arXiv:2410.05470](https://arxiv.org/abs/2410.05470) (CtrlRegen, ICLR 2025) | Controllable diffusion from clean noise, with a knob on how many noise steps to add | SOTA open watermarks | Same family. Goonatilake later finds CtrlRegen+ the *most* forensically detectable remover (AUROC 0.9999) |
 | Kassis and Hengartner, [arXiv:2405.08363](https://arxiv.org/abs/2405.08363) (UnMarker, IEEE S&P 2025) | No decoder feedback. Two adversarial spectral optimizations. Breaks even some semantic watermarks (best remaining detection 43%) | Not production SynthID | Spectral disruption without an oracle is the honest analog of our 16-32 scramble, except UnMarker is optimized and we used a one-octave phase shuffle. Goonatilake: UnMarker TPR 98.28% at 0.1% FPR as a *forensic* leftover |
 | Tallam et al., [arXiv:2505.08234](https://arxiv.org/abs/2505.08234) (SemanticRegen) | Partial, label-free regeneration of main objects | Tree-Ring, StegaStamp, StableSig, DWT/DCT. Not SynthID | Partial redraw. Our collage / photo-pad `not_detected` is a presentation gate, not this attack |
 | Cao et al., [arXiv:2608.10166](https://arxiv.org/abs/2608.10166) (MarkNull, USENIX Security 2026) | On-manifold latent decorrelation via a public diffusion proxy. Claims 100% on 20 Imagen-3 Gemini-verify images. PSNR 25.36 dB, SSIM 0.80 | Small Gemini-verify set | Independent evidence that a no-box latent reconstruction can confuse Gemini. Does not meet this project's 40 dB / 0.99 SSIM release gate. Still generation, not a pixel-only wipe |
+| Cao et al., [arXiv:2602.15364](https://arxiv.org/abs/2602.15364) (MarkSweep, ICASSP 2026) | Learned frequency decomposition and fusion trained on amplified high-frequency watermark noise | HiDDeN and Stable Signature, not production SynthID; reported bit accuracy below 67% | A learned denoiser is a distinct route from our fixed filters, but the paper does not establish transfer to the current OpenAI decoder |
+| Kong et al., [arXiv:2602.01513](https://arxiv.org/abs/2602.01513) (MarkCleaner) | Mask-guided encoder and 2D Gaussian Splatting decoder trained to tolerate micro-geometric displacement | The public abstract does not report production SynthID; code is promised after acceptance | The closest published objective to quiet phase disruption, but there is no released implementation to test here yet |
+| Li et al., [arXiv:2609.31693](https://arxiv.org/abs/2609.31693) (DnD) | Routes a reconstructed grayscale semantic carrier separately from a residual branch, then drops the residual | Seven representative watermark families; the public abstract does not report production SynthID | Another learned representation-level route rather than a fixed coefficient search; the arXiv record does not link an implementation as of this survey |
 | Goonatilake and Ateniese, [arXiv:2605.09203](https://arxiv.org/abs/2605.09203) | Six removers all leave a forensic residue a ResNet-50 sees at >98% TPR @ 1% FPR | Applies to UnMarker, Zhao's WatermarkAttacker, CtrlRegen+ | Defeating a provider oracle is not deniability. This is the product remainder |
 | An et al., [arXiv:2401.08573](https://arxiv.org/abs/2401.08573) (WAVES, ICML 2024) | 26 attacks on StegaStamp, Stable Signature, Tree-Ring. Regeneration, not JPEG, is the attack that matters. StegaStamp TPR@1%FPR 1.00 to 0.01; Tree-Ring 0.99 to 0.12 | Open watermarks | Protocol. Our blur-sigma-7 and 16-32 scramble are closer to WAVES "distortion" than to regeneration |
 | Bulychev et al., [arXiv:2605.16796](https://arxiv.org/abs/2605.16796) (Watermarks Attack Watermarks) | Apply a second watermark, usually with the victim's own post-processing encoder and a different message. On MS-COCO, its end-to-end pipeline lowers Video Seal victim bit accuracy from 0.998 to 0.520 (TPR@1%FPR 0.046) and Pixel Seal from 0.999 to 0.514 (TPR 0.029); the same-method attacker message recovers at 0.99 bit accuracy for both schemes. Quality is reported as an eight-metric normalized composite, not a raw PSNR operating point | Eight open image schemes, not production SynthID; Video Seal is tested on images | Directly motivated the [local open-encoder replication](#re-watermarking-on-open-encoders-2026-09-27). Its MIT [code](https://github.com/MariaBulychev/Watermarks-Attack-Watermarks/tree/0444f52ad972da9e009555f2dc1028d9abe0610e) calls external encoder packages and weights; the top-level license does not license those dependencies |
@@ -240,6 +264,110 @@ regeneration is already in [synthid.md](synthid.md#23-removal-attacks-and-forens
 | Wen et al., [arXiv:2305.20030](https://arxiv.org/abs/2305.20030) (Tree-Ring) | In-generation Fourier pattern in initial noise | Not SynthID | Kill is DDIM inversion plus latent wipe, not a pixel scramble. Lin and Juarez [arXiv:2506.10502](https://arxiv.org/abs/2506.10502) (USENIX 2025) remove it from public knowledge |
 | Fernandez et al., Stable Signature, ICCV 2023 | Fine-tuned VAE decoder | Not SynthID | Regeneration that replaces the decoder is in-family. Our foreign VAE at 22.3 dB did not kill OpenAI SynthID, which is the expected mismatch |
 | Google to [The Verge, 2026-04-14](https://www.theverge.com/ai-artificial-intelligence/911579/google-synthid-ai-watermarking-system-reverse-engineered) | reverse-SynthID does not systematically remove SynthID | Google spokesperson on the spectral bypass | Agrees with our V4 audit and with Bypass: reconstruction or decoder confusion, not a payload delete |
+
+### Historical attack roots
+
+The modern attack families are not conceptually new. Petitcolas, Anderson, and
+Kuhn's 1998 [StirMark work](https://doi.org/10.1007/3-540-49380-8_16) already
+used geometric desynchronization, cropping, resampling, compression, and
+mosaic attacks. Kalker, Linnartz, and van Dijk's 1998
+[detector-analysis attack](https://doi.org/10.1109/ICIP.1998.723516) treated a
+public verifier as an oracle from which an attacker could estimate the mark.
+Kutter, Voloshynovskiy, and Herrigel's 2000
+[copy attack](https://doi.org/10.1117/12.384991) estimated a signal from one
+image and transferred it to another instead of deleting it. Estimation-based
+and collusion attacks then formalized the use of watermark statistics and
+multiple marked copies. Current surrogate attacks, re-watermarking, paired
+clean/marked training, and query optimization are learned versions of these
+same threat models.
+
+### Theory and defensive directions
+
+The theory supports a narrower claim than "all watermarks are removable."
+[Watermarks in the Sand](https://arxiv.org/abs/2311.04378) proves that strong
+watermarking is impossible when an attacker has suitable quality and mixing
+oracles, even with private detection, but its experiments are on text. It does
+not directly prove a 40 dB image attack on SynthID. In the other direction,
+[PRC watermarking](https://proceedings.iclr.cc/paper_files/paper/2025/hash/1331202ea3bb0a53ae897af0bb16e309-Abstract-Conference.html)
+uses pseudorandom error-correcting codes in diffusion latents and reports that
+existing removal attacks fail without substantial quality loss. That defense
+is tied to the generator and does not describe SynthID's post-hoc production
+mark. [Fairoze et al.](https://proceedings.mlr.press/v258/fairoze25a.html)
+show a separate deployment tension: no existing construction simultaneously
+delivers robustness, unforgeability, and public detectability, although such a
+construction exists in theory. These results explain why production systems
+combine private detection, rate limits, payloads, metadata, and retrieval
+instead of relying on one universally robust pixel signal.
+
+### Modern attack families
+
+| Family | Strong primary examples | What the evidence establishes | Limit for this campaign |
+| --- | --- | --- | --- |
+| Adaptive decoder-aware optimization | [WEvade](https://arxiv.org/abs/2305.03807), [adaptive attacks](https://arxiv.org/abs/2309.16952), [LiBRA](https://arxiv.org/abs/2610.03166) | Near-chance decoding or low detection is attainable when the decoder, a close surrogate, or a keyed objective is available | Production decoders and scores are unavailable; our surrogate-gradient attack transferred poorly |
+| Transfer attacks | [Watermark Transfer Attack](https://arxiv.org/abs/2403.15365) and its [pragmatic replication](https://arxiv.org/abs/2412.02576) | Transfer can work under favorable architectural alignment; the independent replication found no more than 21.1% evasion after relaxing those assumptions | A surrogate success is weak evidence for current closed production models |
+| Single-image projection and reconstruction | [Deep Image Prior](https://arxiv.org/abs/2502.13998), [Hide&Seek](https://arxiv.org/abs/2603.01067), [DAWN](https://arxiv.org/abs/2510.07538), [MarkSweep](https://arxiv.org/abs/2602.15364) | An untrained or pretrained image prior can discard high-frequency open marks without paired inference data | DIP reaches about 35-36 dB on the easiest high-frequency marks and performs much worse on TrustMark, RoSteALS, and StegaStamp; none tests production SynthID |
+| Learned paired clean/marked removal | [Push-Pull](https://arxiv.org/abs/2609.31722), [DnD](https://arxiv.org/abs/2609.31693), [FDDWAN](https://arxiv.org/abs/2607.27800), [SPFM-Net](https://arxiv.org/abs/2607.27811) | Training on clean/marked pairs can learn residual separation better than fixed denoisers; Push-Pull reports average BER 0.3958 at 31.07 dB / 0.9554 SSIM across four methods | Requires representative paired data; reported schemes and resolutions are open and mostly 256-512 px |
+| Generative purification and semantic reconstruction | [Zhao et al.](https://arxiv.org/abs/2306.01953), [CtrlRegen](https://arxiv.org/abs/2410.05470), [SemanticRegen](https://arxiv.org/abs/2505.08234), [TokenPure](https://arxiv.org/abs/2512.01314), [RAVEN](https://arxiv.org/abs/2601.08832), MarkNull | This is the most consistently transferable no-box family. RAVEN reports average TPR@1%FPR 0.026 across 15 open schemes; the NeurIPS challenge winner reports 95.7% removal | It re-synthesizes texture, structure, or viewpoint. RAVEN reports distributional FID/CLIP rather than paired 40 dB fidelity; MarkNull reports 25.36 dB / 0.80 SSIM on 20 Gemini images |
+| Super-resolution reconstruction | [SRAttack](https://openreview.net/forum?id=i05MM4h1WZ) | Pre-degrade, super-resolve, then downsample can replace texture while recovering apparent sharpness; it is black-box and training-free | The ICLR submission still says code will be released; it does not test production SynthID and its quality-improvement claim is not pixel identity |
+| Microgeometry and desynchronization | [MarkCleaner](https://arxiv.org/abs/2602.01513), Tree-Ring translation in the [NeurIPS winning solution](https://arxiv.org/abs/2508.21072), RAVEN | Some decoders are more sensitive to subpixel geometry or latent-view shifts than to visible noise | Our current production target survived 2 px translation and several warps; results are scheme-specific |
+| Latent and in-generation watermark attacks | [A Crack in the Bark](https://arxiv.org/abs/2506.10502), [SHIFT](https://arxiv.org/abs/2603.29742), [DRIFT](https://arxiv.org/abs/2609.08213), [Latent Frequency Masking](https://arxiv.org/abs/2610.02010) | Public model knowledge, inversion, or detector-gated resampling can collapse Tree-Ring and related diffusion watermarks | These attacks target a generative model's latent watermark, while production SynthID-Image is post-hoc |
+| Overwriting, copying, and forgery | [Watermarks Attack Watermarks](https://arxiv.org/abs/2605.16796), [WMCopier](https://arxiv.org/abs/2503.22330), [WmForger](https://arxiv.org/abs/2510.20468) | A second encoder or learned foreign residual can erase, replace, or forge open payloads | Requires an encoder, representative training marks, or a reusable residual; WmForger averages 31.2 dB and does not test production SynthID |
+| Forensic detection of removal | [Forensic Stealth](https://arxiv.org/abs/2605.09203), [Forensic Cost](https://arxiv.org/abs/2604.25491), [RemTraceNet](https://arxiv.org/abs/2609.31694) | Clearing the watermark decoder does not clear attack traces. Current removers are readily detected at low FPR, including in few-shot settings | A provider-oracle success is insufficient for forensic deniability or source restoration |
+
+### Benchmarks and evidence quality
+
+Three benchmark generations answer different questions:
+
+- [WAVES](https://arxiv.org/abs/2401.08573) standardized 26 attacks on three
+  influential open methods and established regeneration as the serious attack
+  family rather than JPEG-style corruption.
+- The NeurIPS 2024
+  [Erasing the Invisible technical report](https://anirudhsatheesh.com/assets/publications/2025_eti/paper.pdf)
+  records 2,722 submissions from 298 teams. The top five teams in both black-
+  and beige-box tracks removed at least 89% of marks on average while retaining
+  high benchmark quality. The released data and evaluator cover six open
+  watermark families; they do not contain production SynthID.
+- [WARP](https://arxiv.org/abs/2609.40031) evaluates 32 watermark methods and
+  34 attack families. Its cross-resolution study spans 299 x 299 through 2040 x
+  1300 and shows that many fixed-pixel attacks weaken as resolution rises,
+  while regeneration degrades much less. Its Apache-2.0
+  [implementation](https://github.com/ispras/wibe) is the best available open
+  integration base for broad robustness comparisons, but it still cannot
+  measure a closed provider decoder.
+
+These results also explain why published "high quality" is not a single
+standard. Some work reports FID or CLIP similarity over a distribution, some
+reports a normalized multi-metric challenge score, and some reports paired
+PSNR/SSIM. Across the strongest removal papers, paired quality ranges from
+roughly 18 dB to 45 dB. A semantic match, an attractive redraw, and a 40 dB
+source-preserving edit are different product outcomes.
+
+### MarkNull released-code reproduction, 2026-10-19
+
+The authors subsequently released [MarkNull's implementation](https://github.com/JieCaoSec/MarkNull)
+without a top-level license. A local, untracked reproduction pinned commit
+`4d4067d0ecd0cb2af2bcbf45132efae69b4b703f`, kept the published optimization
+parameters, and added only a deterministic PyTorch seed plus hash-bound input
+and output capture. No upstream code was copied into this public repository.
+
+The unchanged optimization failed before producing an output on the first native
+1024 x 1024 OpenAI image, during the first optimization backward pass. The
+published SynthID case study uses 512 x 512 inputs, so the same source and one
+prompt-matched sibling from the other dated OpenAI model were resized to 512 x
+512 before a second run. Both attacks completed on an H100. Against those resized
+controls, their outputs measured 22.24/23.22 dB grayscale PSNR, 0.620/0.665
+grayscale SSIM, and 0.805/0.761 tolerant edge F1. Visual review confirmed
+obvious texture smoothing and changed fine scene details. The local report is
+`marknull-baseline-v1/report.json` (SHA-256
+`8611df172b739f98cae4d333655f1eb30a1ffcd67c59780fec3c104021c0c135`).
+
+No OpenAI oracle request was made. These outputs already fail the local fidelity
+requirement by a wide margin, and the resized controls had not independently
+established that the OpenAI watermark survived input preparation. This
+reproduction therefore measures portability and quality, not OpenAI attack
+success. It reinforces the distinction in the paper result: MarkNull is a useful
+semantic reconstruction baseline, but it is not evidence for quiet, nearly
+pixel-preserving removal from current OpenAI images.
 
 Quiet pixel-only removal is not a published result on production
 OpenAI or Google SynthID (still true in the 2026-10-17 literature sweep).

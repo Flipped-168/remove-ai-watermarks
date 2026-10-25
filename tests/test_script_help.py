@@ -19,6 +19,8 @@ ROOT = Path(__file__).resolve().parents[1]
         "visible_recall_sample.py",
         "visible_sheets.py",
         "registered_mark_calibrate.py",
+        "restore_source_band.py",
+        "restore_source_detail.py",
         "watermark_benchmark.py",
         "watermark_benchmark_cohort.py",
         "watermark_benchmark_real_cohort.py",

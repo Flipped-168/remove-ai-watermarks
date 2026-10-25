@@ -561,6 +561,18 @@ the paper's favorable composite quality score. MarkNull-A's reported 0.50-second
 runtime and 6.3 GB VRAM are attractive as a future optional fallback, but they
 do not establish a fast, visually lossless pixel-only remover.
 
+The authors later released code, and a pinned 2026-10-19 reproduction tested the
+optimization-based method on two current OpenAI development sources. The
+unchanged method failed during the first optimization backward pass at the
+native 1024 x 1024 size. At the 512 x 512 size used by the paper's SynthID case
+study, both runs completed but reached only 22.24/23.22 dB grayscale PSNR and
+0.620/0.665 grayscale SSIM against their resized controls; visual review showed
+obvious texture smoothing and changed fine details. No OpenAI oracle call was
+made because the candidates already failed the fidelity requirement and the
+resized controls had not been verified positive. The hash-bound local report
+and implementation audit are recorded in
+[`synthid-removal-research.md`](synthid-removal-research.md#marknull-released-code-reproduction-2026-10-19).
+
 ---
 
 ## 3. Detectability and verifier access
@@ -591,6 +603,21 @@ and SynthID outcomes. That API is a remote, OpenAI-scoped verifier, not a local
 decoder. Its documentation also says not to use repeated queries to
 reverse-engineer, remove, or evade a watermark, so an adaptive research loop
 requires separate authorization.
+
+A separate input-only detector campaign did recover repeatable OpenAI and
+Google generation-pipeline patterns and built several local classifiers from
+them. The final bidirectional two-transport candidate reproduced the exact
+task-774 extractor over all 2,986 TRAIN rows. Its primary head made zero false
+assignments on a fresh 450-view, 150-source development set, but the consumed
+robustness screen exposed severe OpenAI recall failures: only 2/26 parent groups
+were admitted after the old resize-850/JPEG-95 transform, and 0/11 after the
+separate exact-850/JPEG-95 transform. No fixed scalar threshold could satisfy
+both recall and zero-false-assignment requirements for any of the four feature
+arms. The candidate was rejected and the larger 4,781-item screen was not run;
+the terminal result is hash-bound as
+`333d3b8dc553cf8762ecbd27d98d7aa0cc1cf471d03aa81880e129bf09179136`.
+Those patterns are real measured generation associations, but this result does
+not qualify them as a robust watermark detector or a remover target.
 
 Google previously described the SynthID Detector service as:
 
@@ -911,6 +938,38 @@ then-current operating point on those two sources; it is not a provider-wide
 removal rate. A six-source `gpt-image-2` expansion on 2026-09-21 subsequently
 expanded the Qwen first-clean range to 0.03125-0.09375 and raised the flat OpenAI
 floor to 0.15625 by the established full-spread rule.
+
+Source-fresh qualifications found two narrower research routes. The frozen
+`qwen-zimage` profile at strength 0.09375 and seed 0 qualified on 6/6 simple
+neutral-studio photographs. Adding source-detail restoration above 1/8 cycle
+per pixel qualified on 12/12 fresh simple product photographs across four
+materials, with minima of 36.13 dB grayscale PSNR, 0.9712 grayscale SSIM, and
+0.8368 tolerant edge F1. The offline implementation is
+[`scripts/restore_source_detail.py`](../scripts/restore_source_detail.py).
+It does not cover people, text, or arbitrary natural scenes: the same split
+failed the quality gates on the next 16-source scene expansion, while all
+16 outputs from the more faithful 1/32 split remained officially detected.
+
+A separate model-independent Chroma selector qualified on 16/16 fresh
+1024 x 1024 brothy-bowl photographs from the dated Flare and Sunburst models.
+For each source it evaluates strength-0.125 candidates at seeds 0 and 1 over a
+frozen frequency-band grid, then selects the quality-positive result with the
+largest RGB RMS change. All 16 source controls were officially detected;
+all selected outputs were officially not detected and passed numeric and
+native visual review, with minima of 30.02 dB PSNR, 0.9000 SSIM, and 0.8280
+edge F1. The offline implementation is
+[`scripts/restore_source_band.py`](../scripts/restore_source_band.py).
+The unchanged selector passed quality and visual checks on 16 adjacent
+non-brothy food photographs, but only one output was oracle-negative.
+Subsequent whole- and partial-source-luminance restoration did not meet the
+frozen success target. These results qualify the tested bowl structure,
+not a general food or natural-scene route.
+
+Both compositors remain outside the installed removal path and do not lower
+the flat provider floors. The qualification protocols, intermediate trials,
+exact oracle denominators, and limitations are recorded in
+[`Measured provider boundaries for qwen-zimage`](module-internals.md#measured-provider-boundaries-for-qwen-zimage)
+and [`Chroma1 plus Z-Image`](module-internals.md#chroma1-plus-z-image).
 
 ### 4.3 Other vendors
 

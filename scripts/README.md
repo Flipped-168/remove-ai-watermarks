@@ -68,6 +68,8 @@ explicitly names a tracked canonical result.
 | `analyze_engine_selection_study.py` | Reduce engine-study output to paired deltas and exact sign tests. |
 | `infer_text_lines.py` | Draft stable source-text lines without modifying pixels. |
 | `qwen_scrub_prototype.py` | Probe low-strength Qwen regeneration on a GPU. |
+| `restore_source_band.py` | Reproduce the qualified model-independent two-seed Chroma frequency-band selector for 1024 x 1024 brothy-bowl photographs. |
+| `restore_source_detail.py` | Reproduce the qualified Qwen high-frequency source-detail compositor for simple product photographs. |
 | `selective_text_restoration.py` | Evaluate text restoration over a scrubbed image. |
 | `synthid_pixel_probe.py` | Run the experimental local SynthID carrier probe. |
 | `rewatermarking_study.py` | Measure same-encoder message replacement and decoded-pixel fidelity on publication-cleared images with the open DWT-DCT, TrustMark, and VideoSeal image encoders. |
