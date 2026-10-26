@@ -39,12 +39,12 @@ Provider verification services and provenance APIs are development-only oracles.
 The entry point is `scripts/provider_oracles.py`; workflow, slot schema, surface order and per-surface behavior live in [`docs/provider-oracles.md`](../../docs/provider-oracles.md). Read it before running or changing a provider check.
 
 - Select each named slot explicitly from the gitignored `.oracle-slots.json` and snapshot it into a separate immutable batch manifest. Never commit the slot file.
-- One call makes one submission. After a refusal, quota response, transport error, or indeterminate verdict, record the exact response and continue with the next slot or surface as its own command.
+- `check-openai` and `check-microsoft` make one submission per call; `run-web` submits each unrecorded row of one prepared manifest once. After a refusal, quota response, transport error, or indeterminate verdict, record the exact response and continue with the next slot or surface as its own command.
 - Deviation from the global rules: do not ask for confirmation before the switch, because anyone doing the task holds standing permission to run the configured checks.
 - Do not add new logins, unbounded retries, or address rotation inside one call; do not walk a prepared route list, and do not merge results from different sessions into one response.
 - Bind every manual result to the exact sanitized upload hash and preserve the provider response verbatim. Keep each surface's verdict separate.
 - Only `gemini-web`, and the `synthid-web` sign-in fallback, use the user's existing real Chrome; every other Web surface uses an isolated Playwright context that never attaches to or copies state from that browser. `synthid-web` terms forbid bulk verification and quota evasion: submit the prepared rows once and never start a sign-in.
-- Proxy and API credentials are read only through a slot's named environment variable and never enter a manifest. API transports keep `trust_env=False` and take no `proxy_url_env`.
+- Credentials never enter a manifest. Proxy URLs and OpenAI keys are read only through a slot's named environment variable (`proxy_url_env`, `api_key_env`); Microsoft resource keys are read into memory through authenticated Azure CLI from the resource identities in `.env`. API transports keep `trust_env=False` and take no `proxy_url_env`.
 
 ## Local gate
 
