@@ -15,11 +15,10 @@ consumer to compensate for a detector or cleaner gap.
 Treat retained inputs as sensitive and read-only. Keep reports, contact sheets,
 sidecars, and derived samples under the library's gitignored `.local-eval/`.
 Never commit a retained input or an artifact derived from one.
-Use only publication-cleared or synthetic files for tracked fixtures.
 
 Before acting, read:
 
-- `CLAUDE.md` and `.claude/rules/development.md`;
+- `.claude/rules/development.md`;
 - `docs/verification-plan.md`;
 - `docs/supported-signals.md` and `docs/watermarking-landscape.md`;
 - [references/coverage-and-cadence.md](references/coverage-and-cadence.md).
@@ -84,13 +83,5 @@ finding.
 9. Run `bash maintain.sh`. Report evidence limits, incomplete rows, crashes,
    unsupported formats, and oracle-unavailable cohorts explicitly.
 
-External oracle uploads use the `provider-oracles` skill. When a cohort needs a
-provider verdict, walk that skill's plan automatically: API first, then the Web
-oracle, including `synthid-web` at synthid.com for Google, then the remaining
-configured account slots. A signed-in account is required only for Gemini.
-Every other Web surface, including `synthid-web`, may use isolated Playwright
-and a proxy, and each proxied run picks a new session in Europe or the United
-States. If SynthID Detector asks for a sign-in, continue that file in the user's
-existing real Chrome on the direct route, and do not start a new login. Do not ask for
-confirmation before switching, and do not adapt candidates against an oracle.
-Do not substitute one provider's verdict for another's.
+When a cohort needs a provider verdict, walk the `provider-oracles` skill's plan
+automatically, by its order and routes, without asking before switching.

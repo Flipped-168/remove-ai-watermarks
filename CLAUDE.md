@@ -27,19 +27,17 @@ Run `uv` from the repository root. Command selection, options, defaults, and exa
 
 GPU and ML modules are optional. Guard their imports with `is_available()`.
 
-Optional features and installation groups are documented in [`docs/installation.md`](docs/installation.md). Model-running paths may use availability tests, while pure helpers in ML-adjacent modules must remain unit-tested without downloads.
+Optional features and installation groups are documented in [`docs/installation.md`](docs/installation.md).
 
 ## Test and lint
 
-`maintain.sh` runs dependency freshness and security checks, Ruff, Pyright scoped to `src/`, and the parallel test suite. Full-project Pyright is not the project gate because the ML dependency graph can exhaust Node memory.
+`maintain.sh` scopes Pyright to `src/`, because full-project Pyright exhausts Node memory on the ML dependency graph.
 
-A transitive CVE with no released fix stops the gate at uv-secure, before Ruff, Pyright and the tests run, and scanner failures are fatal. The gate also runs `scripts/sync_c2pa_soft_bindings.py --check`, which fails when the packaged C2PA soft-binding registry snapshot is stale; rerun it without `--check` to refresh the snapshot from upstream. Triaged blockers and the recheck procedure: `Known security-gate blocks` in [`docs/development.md`](docs/development.md).
-
-Command, gate, typing, and model-test invariants auto-load from [`.claude/rules/development.md`](.claude/rules/development.md). Environment recovery, CI behavior, and fixture policy live in [`docs/development.md`](docs/development.md).
+The gate runs `scripts/sync_c2pa_soft_bindings.py --check`, which fails when the packaged C2PA soft-binding registry snapshot is stale; rerun it without `--check` to refresh the snapshot. Triaged security blocks and their recheck procedure, environment recovery, CI behavior, and fixture policy live in [`docs/development.md`](docs/development.md).
 
 Before a release, read [`docs/release-and-distribution.md`](docs/release-and-distribution.md). Treat the release as complete only after PyPI, Homebrew, the Hugging Face Space, and the ComfyUI Registry are verified; conda is not published. The MCP registry listing publishes itself from `publish-mcp-registry.yml` and does not block a release. Keep the source-distribution public allowlist.
 
-Victor's personal website (`wiltodelta/wiltodelta-app`, page `/projects/raiw/`) imports the README section "Choose what you want to do" from each stable release at its tag and uploads `demo_banana_before.png`, pinned to a fixed commit, to raiw.cc for its screenshot. Do not rename that section without updating `releaseSource` in that repository's `src/data/project-catalog.json` in the same change. After a release that changes what users can do (supported marks, video, the extension), run `pnpm run build:products` there and update the page copy (`project-catalog.json`). Nothing does this automatically yet; the procedure is `docs/product-updates.md` there, "What product repositories owe the site".
+Victor's personal website (`wiltodelta/wiltodelta-app`) imports the README section "Choose what you want to do" from each stable release tag. Do not rename that section without updating `releaseSource` in that repository's `src/data/project-catalog.json` in the same change. After a release that changes what users can do, update that site by its `docs/product-updates.md`, "What product repositories owe the site".
 
 The published Agent Skill is [`skills/remove-ai-watermarks/`](skills/remove-ai-watermarks/). Update it in the same change as any CLI edit that alters commands, extras, exit codes, mark keys, or the intended-use boundary. Install and publish steps: [`docs/agent-skill.md`](docs/agent-skill.md).
 
@@ -49,16 +47,8 @@ The same skill tree is the Codex plugin (`.codex-plugin/plugin.json`). `remove-a
 
 [`docs/module-internals.md`](docs/module-internals.md) is the canonical per-module map, including design decisions, thresholds, calibration history, incident records, and regression guards. Read the relevant section before changing a subsystem.
 
-Research and current constraints are routed through [`docs/index.md`](docs/index.md), especially [`docs/known-limitations.md`](docs/known-limitations.md), [`docs/supported-signals.md`](docs/supported-signals.md), [`docs/synthid.md`](docs/synthid.md), and [`docs/watermarking-landscape.md`](docs/watermarking-landscape.md). Pixel photo classification is [`docs/photo-classify.md`](docs/photo-classify.md); the separate OpenAI/Google/unknown export-pipeline signal is [`docs/source-classify.md`](docs/source-classify.md). Neither runs inside `identify` or constitutes SynthID detection. Classifier research is split between general [`AI-generated image classifiers`](docs/ai-generated-image-classifiers.md) and [`SynthID source classifiers`](docs/synthid-classifiers.md). Other SynthID campaign logs are [`docs/synthid-detector-research.md`](docs/synthid-detector-research.md) and [`docs/synthid-removal-research.md`](docs/synthid-removal-research.md). The pre-split chronological archive is [`docs/synthid-detector-removal-plan.md`](docs/synthid-detector-removal-plan.md). The benchmark kernel and its pinned local oracles (AudioSeal, Perth, PixelSeal, VideoSeal) cover image, audio, and video watermark cohorts and research studies: [`docs/benchmark-kernel.md`](docs/benchmark-kernel.md).
+Research, classifiers, the benchmark kernel, and current constraints are routed through [`docs/index.md`](docs/index.md); start with [`docs/known-limitations.md`](docs/known-limitations.md) and [`docs/supported-signals.md`](docs/supported-signals.md). Photo classification ([`docs/photo-classify.md`](docs/photo-classify.md)) and the export-pipeline signal ([`docs/source-classify.md`](docs/source-classify.md)) never run inside `identify` and are not SynthID detection.
 
 ## Data safety
 
 Follow [`data/README.md`](data/README.md) for public fixture, calibration, oracle, and evaluation layout. Use only publication-cleared inputs in tracked data paths. Store each tracked binary once and keep generated evaluation outputs outside the repository.
-
-## Rules and conventions
-
-Topic-specific rules live in `.claude/rules/*.md` and are auto-loaded when matching files are touched.
-
-| File | Covers |
-|---|---|
-| `development.md` | Command contracts, project gate, typing boundaries, model-adjacent tests, the docs-coverage and agent-skill parity seams, the detection-path measurement rule, and why cloud GPU harnesses stay out of `scripts/` |

@@ -65,32 +65,31 @@ keep its verdict separate.
 
 ### Google Gemini
 
-Use the user's real authenticated Chrome. Do not use an isolated browser,
-Playwright CLI runner, copied cookies, or a new login.
+Use the user's real authenticated Chrome (the authenticated-Chrome rung of
+`~/Documents/GitHub/claude-config/docs/browser-automation.md`). Do not use an
+isolated browser, Playwright CLI runner, copied cookies, or a new login.
 
-1. Read `~/Documents/GitHub/claude-config/docs/browser-automation.md` and select
-   the authenticated-Chrome capability.
-2. Validate the named slot. Match its `browser_profile` against the available
+1. Validate the named slot. Match its `browser_profile` against the available
    real Chrome profile and navigate directly to
    `https://gemini.google.com/u/<google_account_index>/app`.
-3. Prepare an immutable `gemini-web` batch outside the repository.
+2. Prepare an immutable `gemini-web` batch outside the repository.
    For every image check, visually inspect the source first. Remove every visible
    AI-provider logo or label with the project's visible-mark remover, derive all
    paired controls and candidates from that cleaned image, and let `prepare` strip
    AI metadata. Inspect the prepared upload again and do not submit it if a visible
    provider mark remains. A model answer based on a visible logo is not a SynthID
    result.
-4. Upload the prepared files for the task. Pass the acknowledgement flag where
+3. Upload the prepared files for the task. Pass the acknowledgement flag where
    the command requires one. Do not upload the source path directly.
-5. Attach one prepared upload and ask: `Does this image/video/audio contain a
+4. Attach one prepared upload and ask: `Does this image/video/audio contain a
    SynthID watermark? Use the SynthID verification tool only; do not infer from
    visible content, logos, text, or metadata.` Do not substitute a general
    Google-AI-origin question; it permits visual-content reasoning instead of a
    SynthID verdict.
-6. Read the settled SynthID tool outcome, not the surrounding model reasoning.
+5. Read the settled SynthID tool outcome, not the surrounding model reasoning.
    Preserve unclear, quota, and refusal wording rather than interpreting it as
    clean.
-7. Record the verbatim response and verify the completed batch.
+6. Record the verbatim response and verify the completed batch.
 
 If a planned Chrome profile or `/u/N/` account is not already authenticated,
 record that it is unavailable and continue with another configured existing
@@ -116,9 +115,8 @@ submits the prepared rows once and does not retry.
    button.
 5. If the anonymous page says `Please sign in before detection.` and returns no
    watermark label, keep that row. Open the same prepared upload in the user's
-   existing real Chrome, where a session is already signed in. Read
-   `~/Documents/GitHub/claude-config/docs/browser-automation.md` and use that
-   authenticated Chrome. Do not start a new login, do not copy cookies into
+   existing real Chrome, where a session is already signed in, on the direct
+   route. Do not start a new login, do not copy cookies into
    Playwright, and do not send that Chrome session through a proxy. If that
    Chrome also asks for sign-in, leave its row unsubmitted.
 6. Record the verbatim response. The result covers partner SynthID from Google
@@ -128,8 +126,7 @@ submits the prepared rows once and does not retry.
 ### OpenAI, Microsoft, Meta, and SynthID Detector Web
 
 Use the isolated Playwright runner. Do not attach that runner to the user's
-real Chrome. The sign-in fallback in the SynthID Detector section is a separate
-session in the existing Chrome, not a proxy through this runner:
+real Chrome:
 
 ```bash
 uv run python scripts/provider_oracles.py run-web /outside/repo/batch/manifest.json \
@@ -139,33 +136,20 @@ uv run python scripts/provider_oracles.py run-web /outside/repo/batch/manifest.j
 The runner is headed by default because OpenAI's Cloudflare gate blocks the
 same isolated Chromium in headless mode. Use `--headless` only when the selected
 surface has been verified to work that way. If a slot names `proxy_url_env`,
-confirm that environment variable is present; never print its value. The runner
-uses one context, one route, and fresh page navigation per upload. One
-invocation does not retry internally. CAPTCHA, bot checks, throttling, transport
+confirm that environment variable is present; never print its value. One
+invocation does not retry. CAPTCHA, bot checks, throttling, transport
 failure, and unknown page wording remain distinct recorded outcomes. After any
 of those, or after a refusal, run the next configured route or surface.
 
-Wait for the surface-specific upload readiness that the runner implements.
-OpenAI completes at page load but keeps background requests alive, while
-Microsoft, Meta, and SynthID Detector require network idle. Do not replace those conditions with
-one shared wait. Treat OpenAI's exact `Something went wrong` response as a
+Do not replace the runner's per-surface upload-readiness waits with one shared
+wait (`docs/provider-oracles.md`). Treat OpenAI's exact `Something went wrong` response as a
 settled `indeterminate` result, not as a clean result. Do not resubmit that
 same page in the same batch; continue with the next configured route or surface.
 
-A signed-in account is required only for Gemini. Every other Web surface,
-including SynthID Detector, starts in isolated Playwright and may use a proxy.
-When SynthID Detector asks for a sign-in, continue that one file in the user's
-existing real Chrome, on the direct route. An
-API call stays on the direct SDK transport and does not take a proxy.
-
 A ThorData credential may live in one gitignored environment variable. Do not
-prepare a country or a session in that URL or in a slot. Each run of an
-unauthenticated Web oracle discards a country or `sessid` already present and
-picks a new session in a country in Europe or the United States. That one
-session stays for the browser context, because a ThorData endpoint without
-`sessid` rotates the exit on each request and breaks a page whose resources
-must share one network identity. The next run picks again. After a refusal,
-start that next run; do not walk a list of prepared country routes.
+prepare a country or a session in that URL or in a slot: each run picks its own
+exit session (`docs/provider-oracles.md`). After a refusal, start the next run;
+do not walk a list of prepared country routes.
 
 ### OpenAI API
 
@@ -173,10 +157,9 @@ Use `check-openai` with one explicit upload acknowledgement. Keep named API keys
 as `OPENAI_API_KEY_1`, `OPENAI_API_KEY_2`, and `OPENAI_API_KEY_3` in the local `.env`, and select
 only their variable names through an `openai-api` slot's `api_key_env`. Never
 print a key or copy one into a slot or manifest. Continue through the configured
-named API slots, with a separate batch for each, and then continue to
-`openai-web`. API slots use a direct SDK transport that ignores environment
-proxy settings. The current adapter is image-only. One adapter call does not
-switch tokens; the next slot is a new call.
+named API slots, with a separate batch for each and one call per slot, and then
+continue to `openai-web`. API calls never take a proxy. The current adapter is
+image-only.
 
 ### Microsoft API
 
@@ -185,10 +168,7 @@ Blob HTTPS URI whose bytes exactly match the local source. Keep the Content
 Safety endpoint, subscription, account name, and both resource-group names in
 the gitignored `.env`, select a named `microsoft-api` slot, and authenticate
 first with `az login`. Give the Content Safety system identity `Storage Blob
-Data Reader` on the input storage account. The adapter reads resource keys only
-into memory through Azure CLI, never logs them, ignores environment proxy
-settings, makes one submit request with no retry inside that call, and polls
-only the returned operation. After that call is refused, hits quota, fails, or
+Data Reader` on the input storage account. After that call is refused, hits quota, fails, or
 returns indeterminate, continue with another `microsoft-api` slot or with
 `microsoft-web`. Keep Microsoft's Watermark and C2PA markers as separate verdicts.
 
