@@ -20,16 +20,15 @@ jobs:
         run: git remote add upstream https://github.com/wiltodelta/remove-ai-watermarks.git || true
       - name: Fetch upstream
         run: git fetch upstream
-      - name: Save our workflow
-        run: cp .github/workflows/sync-upstream.yml /tmp/sync-upstream.yml.bak
-      - name: Merge upstream
-        run: git merge upstream/HEAD --no-edit || git merge FETCH_HEAD --no-edit
-      - name: Restore only our workflow file
+      - name: Merge upstream (ours strategy)
+        run: |
+          git merge upstream/HEAD --no-edit -X ours || git merge FETCH_HEAD --no-edit -X ours
+      - name: Keep only our workflow
         run: |
           mkdir -p .github/workflows
-          find .github/workflows -type f -delete
-          cp /tmp/sync-upstream.yml.bak .github/workflows/sync-upstream.yml
+          find .github/workflows -type f ! -name "sync-upstream.yml" -delete
+      - name: Commit and push
+        run: |
           git add .github/workflows
           git commit -m "chore: preserve fork sync workflow" --allow-empty
-      - name: Push
-        run: git push
+          git push
