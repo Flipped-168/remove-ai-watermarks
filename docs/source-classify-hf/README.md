@@ -21,61 +21,68 @@ This model is **not a SynthID detector** and does not decode or verify any crypt
   - `768-d` phase-free `16x16` log-power and radial spectral features (`source_spectral`).
   - `64-d` directional / block-boundary (`8x8` and `16x16`) / chroma-aliasing / azimuthal-anisotropy features (`augment_892d_to_956d`).
 - **Stage 1 (`43` specialist units across `10` canonical providers):**
-  - `10` global provider specialists + `33` subfamily specialists, each combining a 3-seed MLP Soup, a vectorized fixed-depth `HistGradientBoosting` tree ensemble, and a distilled `ExtraTrees -> MLP` student with calibration-reoptimized distilled blend weights (`w_e <= 0.25`), pooled via drift-bounded zero-inflation subfamily blending (`alpha in {0.0, 0.55, 0.70, 0.85, 1.0}`) and routed by a unified damped competitive margin (`gamma = 0.60`).
+  - `10` global provider specialists + `33` subfamily specialists, each combining a 3-seed MLP Soup, a vectorized fixed-depth `HistGradientBoosting` tree ensemble, and a distilled `ExtraTrees -> MLP` student with calibration-reoptimized distilled blend weights (`w_e <= 0.25`), pooled via drift-bounded zero-inflation subfamily blending (`alpha in {0.0, 0.55, 0.70, 0.85, 1.0}`) across 16 real-image varieties and routed by a unified damped competitive margin (`gamma = 0.60`).
 - **Stage 2 (`9` stacked version heads, `999-d`):**
   - Feature-subsampled vectorized `HistGradientBoosting` tree ensembles taking the `956-d` features (and Stage-1 log-odds scores) to predict the canonical model/export subfamily (`version_subfamily`).
 - **Artifact:** `multi-provider-source-v3.npz` (`allow_pickle=False`)
-- **SHA-256:** `5c271b0ba7d7ae6b3965de18cade40c867a6bcc31f6848422111667aa2deba53`
+- **SHA-256:** `e5264354edb0109461e3c4988e3267903a8a2a0648b05e81705dee298be97806`
 
 The artifact contains only learned parameters, normalization constants, tree arrays, labels, and calibrated thresholds. It does not contain training images, paths, image hashes, embeddings, or a training catalog.
 
-## Evaluation (`36,761` clean audited samples; `7,395` locked test)
+## Evaluation (`40,974` clean audited samples; `8,476` locked test)
 
-The operating point was selected on a disjoint `5,591`-image calibration split (`0.83%` calibration `unknown` false-positive rate across 9 real-image varieties). On the `7,395`-image locked test split (`3,329` multi-variety `unknown` negatives + `4,066` AI provider images):
+The operating point was selected on a disjoint `6,708`-image calibration split (`0.19%` calibration `unknown` false-positive rate across 16 fine-grained real-image varieties). On the `8,476`-image locked test split (`4,410` multi-variety `unknown` negatives + `4,066` AI provider images):
 
-- **Unified 10-provider router:** `99.01%` `unknown` specificity (`0.99%` test `unknown` FPR; `1.20%` photographic FPR and `0.74%` non-photographic structured FPR) and `61.68%` aggregate target recall.
+- **Unified 10-provider router:** `99.68%` `unknown` specificity (`0.32%` test `unknown` FPR; `0.37%` photographic FPR and `0.27%` non-photographic structured FPR) and `53.30%` aggregate target recall.
 
 | Provider | Test count | Standalone ROC AUC | Router recall | Router precision | Stage-2 version accuracy |
 |---|---:|---:|---:|---:|---:|
-| `openai` | 1,146 | 0.9803 | 70.9% | 96.1% | 86.8% |
-| `google` | 1,038 | 0.9786 | 70.3% | 96.1% | 94.8% |
-| `bytedance` | 371 | 0.9451 | 59.3% | 96.9% | 89.2% |
-| `flux` | 740 | 0.9558 | 47.2% | 96.1% | 92.8% |
-| `stable_diffusion` | 397 | 0.9780 | 53.9% | 93.0% | 85.4% |
-| `meta` | 94 | 0.9667 | 77.7% | 91.3% | — (`meta:imagine`) |
-| `midjourney` | 77 | 0.9675 | 64.9% | 64.9% | 96.1% |
-| `ideogram` | 72 | 0.9817 | 33.3% | 92.3% | 58.3% |
-| `firefly` | 83 | 0.8968 | 30.1% | 86.2% | 100.0% |
-| `xai` | 48 | 0.9244 | 22.9% | 78.6% | 68.8% |
+| `openai` | 1,146 | 0.9807 | 65.0% | 96.6% | 86.8% |
+| `google` | 1,038 | 0.9804 | 56.1% | 97.5% | 94.8% |
+| `bytedance` | 371 | 0.9456 | 48.2% | 98.9% | 87.9% |
+| `flux` | 740 | 0.9604 | 41.2% | 97.8% | 92.8% |
+| `stable_diffusion` | 397 | 0.9803 | 48.1% | 96.0% | 85.4% |
+| `meta` | 94 | 0.9690 | 77.7% | 94.8% | — (`meta:imagine`) |
+| `midjourney` | 77 | 0.9742 | 54.5% | 84.0% | 96.1% |
+| `ideogram` | 72 | 0.9825 | 34.7% | 78.1% | 59.7% |
+| `firefly` | 83 | 0.8993 | 21.7% | 85.7% | 100.0% |
+| `xai` | 48 | 0.9291 | 14.6% | 77.8% | 64.6% |
 
-### Held-out real-image specificity by variety (`3,329` test negatives)
+### Held-out real-image specificity by variety (`4,410` test negatives across 16 real classes + foreign AI)
 
 | Real-image variety | Test count | False positives | False-positive rate | Specificity |
 |---|---:|---:|---:|---:|
-| `photo` | 1,839 | 22 | 1.20% | 98.80% |
-| `photo_retouched` | 194 | 1 | 0.52% | 99.48% |
-| `vector` | 67 | 1 | 1.49% | 98.51% |
-| `game_art` | 111 | 2 | 1.80% | 98.20% |
-| `digital_art` | 469 | 1 | 0.21% | 99.79% |
-| `interface` | 79 | 0 | 0.00% | 100.00% |
-| `diagram` | 231 | 2 | 0.87% | 99.13% |
-| `document` | 230 | 0 | 0.00% | 100.00% |
-| `stress_recompressed` | 103 | 4 | 3.88% | 96.12% |
+| `photo` | 2,183 | 8 | 0.37% | 99.63% |
+| `photo_retouched` | 321 | 1 | 0.31% | 99.69% |
+| `classical_inpaint` | 17 | 0 | 0.00% | 100.00% |
+| `digital_art` | 441 | 1 | 0.23% | 99.77% |
+| `game_art` | 131 | 1 | 0.76% | 99.24% |
+| `vector` | 135 | 0 | 0.00% | 100.00% |
+| `interface` | 171 | 1 | 0.58% | 99.42% |
+| `diagram` | 98 | 1 | 1.02% | 98.98% |
+| `chart_data_viz` | 159 | 0 | 0.00% | 100.00% |
+| `technical_architecture` | 84 | 0 | 0.00% | 100.00% |
+| `procedural_graphic` | 13 | 0 | 0.00% | 100.00% |
+| `document` | 165 | 0 | 0.00% | 100.00% |
+| `gov_scientific_doc` | 32 | 0 | 0.00% | 100.00% |
+| `receipt_invoice` | 122 | 0 | 0.00% | 100.00% |
+| `print_publishing` | 229 | 0 | 0.00% | 100.00% |
+| `stress_recompressed` | 103 | 1 | 0.97% | 99.03% |
 | `foreign_ai` | 6 | 0 | 0.00% | 100.00% |
 
 ### External blind multi-variety real-image verification (`selective-v8`, `2,267` untouched images)
 
-Evaluated on the hash-disjoint external `selective-v8` blind real-image cohorts (`2,267` images never seen in train, calibration, or test): **14 / 2,267 false positives (`0.62%` overall FPR, `99.38%` specificity)**.
+Evaluated on the hash-disjoint external `selective-v8` blind real-image cohorts (`2,267` images never seen in train, calibration, or test): **8 / 2,267 false positives (`0.35%` overall FPR, `99.65%` specificity)**.
 
 | Blind `selective-v8` cell | Evaluated | False positives | False-positive rate | Specificity |
 |---|---:|---:|---:|---:|
-| `photo` | 450 | 4 | 0.89% | 99.11% |
+| `photo` | 450 | 3 | 0.67% | 99.33% |
 | `vector` | 332 | 0 | 0.00% | 100.00% |
-| `game_art` | 230 | 6 | 2.61% | 97.39% |
-| `interface` | 342 | 2 | 0.58% | 99.42% |
+| `game_art` | 230 | 4 | 1.74% | 98.26% |
+| `interface` | 342 | 0 | 0.00% | 100.00% |
 | `diagram` | 305 | 0 | 0.00% | 100.00% |
 | `document` | 308 | 0 | 0.00% | 100.00% |
-| `stress_recompressed` | 300 | 2 | 0.67% | 99.33% |
+| `stress_recompressed` | 300 | 1 | 0.33% | 99.67% |
 
 ## Intended use
 
