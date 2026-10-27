@@ -75,7 +75,7 @@ CLASSES: tuple[SourceLabel, ...] = (*ALL_PROVIDER_CLASSES, "unknown")
 
 WEIGHTS_ENV = "RAIW_SOURCE_CLASSIFY_WEIGHTS"
 WEIGHTS_REPO = "wiltodelta/raiw-source-classify"
-WEIGHTS_REVISION = "59b8ccaeaa4bd672f9cb9d0100f1060362496073"
+WEIGHTS_REVISION = "24a03264ae157ec0d18f8b7215b33df7a403ca01"
 MODEL_FILE = "multi-provider-source-v3.npz"
 MODEL_SHA256 = "e5264354edb0109461e3c4988e3267903a8a2a0648b05e81705dee298be97806"
 MODEL_SCHEMA = "multi-provider-source-v3"
