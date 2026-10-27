@@ -21,61 +21,61 @@ This model is **not a SynthID detector** and does not decode or verify any crypt
   - `768-d` phase-free `16x16` log-power and radial spectral features (`source_spectral`).
   - `64-d` directional / block-boundary (`8x8` and `16x16`) / chroma-aliasing / azimuthal-anisotropy features (`augment_892d_to_956d`).
 - **Stage 1 (`43` specialist units across `10` canonical providers):**
-  - `10` global provider specialists + `33` subfamily specialists, each combining a 3-seed MLP Soup (`0.35`), a vectorized fixed-depth `HistGradientBoosting` tree ensemble (`0.35`), and a distilled `ExtraTrees -> MLP` student (`0.30`), pooled via zero-inflation subfamily blending (`alpha in {0.0, 0.65, 0.85, 1.0}`) and routed by a unified damped competitive margin (`gamma = 0.60`).
+  - `10` global provider specialists + `33` subfamily specialists, each combining a 3-seed MLP Soup, a vectorized fixed-depth `HistGradientBoosting` tree ensemble, and a distilled `ExtraTrees -> MLP` student with calibration-reoptimized distilled blend weights (`w_e <= 0.25`), pooled via drift-bounded zero-inflation subfamily blending (`alpha in {0.0, 0.55, 0.70, 0.85, 1.0}`) and routed by a unified damped competitive margin (`gamma = 0.60`).
 - **Stage 2 (`9` stacked version heads, `999-d`):**
-  - Vectorized `HistGradientBoosting` tree ensembles taking the `956-d` features concatenated with all `43` Stage-1 log-odds scores to predict the canonical model/export subfamily (`version_subfamily`).
+  - Feature-subsampled vectorized `HistGradientBoosting` tree ensembles taking the `956-d` features (and Stage-1 log-odds scores) to predict the canonical model/export subfamily (`version_subfamily`).
 - **Artifact:** `multi-provider-source-v3.npz` (`allow_pickle=False`)
-- **SHA-256:** `7a550c2613af99ea784d2f25396776de0aa4ecf2efabe937054679f620b5ee5c`
+- **SHA-256:** `5c271b0ba7d7ae6b3965de18cade40c867a6bcc31f6848422111667aa2deba53`
 
 The artifact contains only learned parameters, normalization constants, tree arrays, labels, and calibrated thresholds. It does not contain training images, paths, image hashes, embeddings, or a training catalog.
 
 ## Evaluation (`36,761` clean audited samples; `7,395` locked test)
 
-The operating point was selected on a disjoint `5,591`-image calibration split (`0.75%` calibration `unknown` false-positive rate across 9 real-image varieties). On the `7,395`-image locked test split (`3,329` multi-variety `unknown` negatives + `4,066` AI provider images):
+The operating point was selected on a disjoint `5,591`-image calibration split (`0.83%` calibration `unknown` false-positive rate across 9 real-image varieties). On the `7,395`-image locked test split (`3,329` multi-variety `unknown` negatives + `4,066` AI provider images):
 
-- **Unified 10-provider router:** `98.95%` `unknown` specificity (`1.05%` test `unknown` FPR; `1.25%` photographic FPR and `0.81%` non-photographic structured FPR) and `61.07%` aggregate target recall.
+- **Unified 10-provider router:** `99.01%` `unknown` specificity (`0.99%` test `unknown` FPR; `1.20%` photographic FPR and `0.74%` non-photographic structured FPR) and `61.68%` aggregate target recall.
 
 | Provider | Test count | Standalone ROC AUC | Router recall | Router precision | Stage-2 version accuracy |
 |---|---:|---:|---:|---:|---:|
-| `openai` | 1,146 | 0.9750 | 70.3% | 96.4% | 85.6% |
-| `google` | 1,038 | 0.9747 | 72.2% | 95.5% | 93.4% |
-| `bytedance` | 371 | 0.9363 | 59.0% | 96.1% | 88.1% |
-| `flux` | 740 | 0.9557 | 47.4% | 94.1% | 89.7% |
-| `stable_diffusion` | 397 | 0.9784 | 44.8% | 95.2% | 78.3% |
-| `meta` | 94 | 0.9652 | 77.7% | 90.1% | — (`meta:imagine`) |
-| `midjourney` | 77 | 0.9718 | 64.9% | 60.2% | 89.6% |
-| `ideogram` | 72 | 0.9798 | 30.6% | 84.6% | 62.5% |
-| `firefly` | 83 | 0.9020 | 31.3% | 100.0% | 96.4% |
-| `xai` | 48 | 0.9295 | 18.8% | 75.0% | 68.8% |
+| `openai` | 1,146 | 0.9803 | 70.9% | 96.1% | 86.8% |
+| `google` | 1,038 | 0.9786 | 70.3% | 96.1% | 94.8% |
+| `bytedance` | 371 | 0.9451 | 59.3% | 96.9% | 89.2% |
+| `flux` | 740 | 0.9558 | 47.2% | 96.1% | 92.8% |
+| `stable_diffusion` | 397 | 0.9780 | 53.9% | 93.0% | 85.4% |
+| `meta` | 94 | 0.9667 | 77.7% | 91.3% | — (`meta:imagine`) |
+| `midjourney` | 77 | 0.9675 | 64.9% | 64.9% | 96.1% |
+| `ideogram` | 72 | 0.9817 | 33.3% | 92.3% | 58.3% |
+| `firefly` | 83 | 0.8968 | 30.1% | 86.2% | 100.0% |
+| `xai` | 48 | 0.9244 | 22.9% | 78.6% | 68.8% |
 
 ### Held-out real-image specificity by variety (`3,329` test negatives)
 
 | Real-image variety | Test count | False positives | False-positive rate | Specificity |
 |---|---:|---:|---:|---:|
-| `photo` | 1,839 | 23 | 1.25% | 98.75% |
+| `photo` | 1,839 | 22 | 1.20% | 98.80% |
 | `photo_retouched` | 194 | 1 | 0.52% | 99.48% |
-| `vector` | 67 | 0 | 0.00% | 100.00% |
-| `game_art` | 111 | 1 | 0.90% | 99.10% |
-| `digital_art` | 469 | 3 | 0.64% | 99.36% |
+| `vector` | 67 | 1 | 1.49% | 98.51% |
+| `game_art` | 111 | 2 | 1.80% | 98.20% |
+| `digital_art` | 469 | 1 | 0.21% | 99.79% |
 | `interface` | 79 | 0 | 0.00% | 100.00% |
-| `diagram` | 231 | 4 | 1.73% | 98.27% |
+| `diagram` | 231 | 2 | 0.87% | 99.13% |
 | `document` | 230 | 0 | 0.00% | 100.00% |
-| `stress_recompressed` | 103 | 3 | 2.91% | 97.09% |
+| `stress_recompressed` | 103 | 4 | 3.88% | 96.12% |
 | `foreign_ai` | 6 | 0 | 0.00% | 100.00% |
 
 ### External blind multi-variety real-image verification (`selective-v8`, `2,267` untouched images)
 
-Evaluated on the hash-disjoint external `selective-v8` blind real-image cohorts (`2,267` images never seen in train, calibration, or test): **15 / 2,267 false positives (`0.66%` overall FPR, `99.34%` specificity)**.
+Evaluated on the hash-disjoint external `selective-v8` blind real-image cohorts (`2,267` images never seen in train, calibration, or test): **14 / 2,267 false positives (`0.62%` overall FPR, `99.38%` specificity)**.
 
 | Blind `selective-v8` cell | Evaluated | False positives | False-positive rate | Specificity |
 |---|---:|---:|---:|---:|
 | `photo` | 450 | 4 | 0.89% | 99.11% |
 | `vector` | 332 | 0 | 0.00% | 100.00% |
-| `game_art` | 230 | 7 | 3.04% | 96.96% |
+| `game_art` | 230 | 6 | 2.61% | 97.39% |
 | `interface` | 342 | 2 | 0.58% | 99.42% |
-| `diagram` | 305 | 1 | 0.33% | 99.67% |
+| `diagram` | 305 | 0 | 0.00% | 100.00% |
 | `document` | 308 | 0 | 0.00% | 100.00% |
-| `stress_recompressed` | 300 | 1 | 0.33% | 99.67% |
+| `stress_recompressed` | 300 | 2 | 0.67% | 99.33% |
 
 ## Intended use
 
