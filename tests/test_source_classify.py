@@ -111,6 +111,18 @@ def test_weights_revision_and_sha256_are_pinned_hex() -> None:
     assert raiw.SourceClassification is source_classify.SourceClassification
 
 
+def test_log_spectrum_discards_translation_phase() -> None:
+    from remove_ai_watermarks._internal.source_spectral import phase_free_log_spectrum
+
+    rng = np.random.default_rng(17)
+    channel = rng.normal(size=(32, 32))
+
+    original = phase_free_log_spectrum(channel)
+    translated = phase_free_log_spectrum(np.roll(channel, shift=(5, -7), axis=(0, 1)))
+
+    assert np.allclose(original, translated, rtol=1e-12, atol=1e-12)
+
+
 def test_spectral_feature_is_finite_and_has_the_frozen_width() -> None:
     from remove_ai_watermarks._internal.source_spectral import feature_from_image, make_geometry
 

@@ -23,10 +23,10 @@ drop the pixels.
 | `probe-weights-clip-l-ft.npz` | Ridge mean, scale, weights, `thr_oi_1pct` |
 | `meta-split.json` | Meta train 217, hold-out v2 79, hold-out v3 198 |
 
-Run:
+Run from the private `wiltodelta/raiw-classifier-training` repository:
 
 ```bash
-uv run python scripts/retrain_photo_classify.py --pack DIR --out DIR
+uv run python ai-photo-2026-08-22/retrain_photo_classify.py --pack DIR --out DIR
 ```
 
 Seeds are fixed: detector `20260940`, provider `20260956`. Two consecutive
@@ -69,8 +69,9 @@ them as other domains, not as extra CLIP-L negatives.
 ## What the freeze script does
 
 Historically `freeze_both_models.py` built the catalog from local paths, then
-trained. That campaign code is private and is not in this repository. The
-public entry is `scripts/retrain_photo_classify.py`, which skips catalog
+trained. All training code lives in `wiltodelta/raiw-classifier-training` and is
+not in this library repository. The cache-only retrain entry is
+`ai-photo-2026-08-22/retrain_photo_classify.py`, which skips catalog
 construction and fits the same heads from the pack above.
 
 1. Load CLIP-L-ft vectors by sha256. Fit the 768-512-128-1 MLP on

@@ -188,6 +188,6 @@ freezes); the operating point records it in
 module. A no-signal provenance result stays unknown until you call `classify`
 yourself.
 
-Training data, the retrain pack (caches only, no images), and
-`scripts/retrain_photo_classify.py` are in
+Training data, the retrain pack (caches only, no images), and the training
+scripts in `wiltodelta/raiw-classifier-training` are documented in
 [photo-classify-training.md](photo-classify-training.md).

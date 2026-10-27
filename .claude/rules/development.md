@@ -56,9 +56,11 @@ Boundary modules for cv2, Torch, and Diffusers may carry narrow per-file relaxat
 
 From a worktree without its own `.venv`, `uv run` imports the package from the main checkout, where the editable install points. A script measuring a worktree's edit must assert `module.__file__` resolves inside that worktree (insert its `src` at `sys.path[0]` when it does not).
 
-## Research harnesses stay out of this repository
+## Research harnesses and classifier training stay out of this repository
 
 Keep any research script that needs a cloud GPU account outside this repository; `scripts/` carries no `modal` import, and `test_scripts_carry_no_cloud_gpu_harness` is the canary. Leave only the offline analysis step here, as `scripts/analyze_engine_selection_study.py` is. Do not mechanize the identifier half of the boundary audit in a tracked file: a tracked denylist publishes the strings it exists to keep out.
+
+Classifier training scripts and local training caches/datasets live exclusively in the private `wiltodelta/raiw-classifier-training` repository (with `images/`, `data/`, `.npz`, `.joblib`, and `.pt` gitignored); this repository keeps only runtime inference (`classify.py`, `source_classify.py`) and Hugging Face Hub publishers (`scripts/publish_photo_classify_hf.py`, `scripts/publish_source_classify_hf.py`).
 
 ## Visible-mark example gallery
 

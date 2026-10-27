@@ -32,7 +32,8 @@ and FLUX 1280-pixel PNG exports. It is useful for testing source-pipeline
 features, but it is not a causal SynthID corpus: renderer, dimensions, encoder,
 and watermark state all change together.
 
-The paper-inspired probe in [`scripts/spectral_pipeline_probe.py`](../scripts/spectral_pipeline_probe.py)
+The paper-inspired probe in `source-pipeline-2026-09-15/spectral_pipeline_probe.py`
+(in `wiltodelta/raiw-classifier-training`)
 discards Fourier phase, subtracts each image's radial log-magnitude envelope,
 pools luma plus two opponent-color spectra, and fits a dual ridge classifier.
 Matching prompt ids stay together in a grouped five-fold evaluation. The
@@ -68,8 +69,9 @@ The follow-up experiment combined the existing 124-d forensic descriptor with
 the 16x16 phase-free spectral grid in a class-balanced ridge head. Its three
 outputs are `openai`, `google`, and `unknown`; a provider result is emitted only
 when it beats both the other provider and `unknown` by a margin selected on a
-separate calibration split. The public implementation is
-[`scripts/source_pipeline_classifier.py`](../scripts/source_pipeline_classifier.py).
+separate calibration split. The implementation is
+`source-pipeline-2026-09-15/source_pipeline_classifier.py` in
+`wiltodelta/raiw-classifier-training`.
 It includes training, strict pickle-free model loading, and JSON inference, but
 no fitted weights: the experimental training freeze contains inputs that are
 not redistributable. This keeps the code reproducible without publishing a
@@ -100,10 +102,10 @@ Training requires hash-disjoint `train` and `calibration` directories, each
 with `openai`, `google`, and `unknown` subdirectories:
 
 ```bash
-uv run python scripts/source_pipeline_classifier.py train \
+uv run python source-pipeline-2026-09-15/source_pipeline_classifier.py train \
   /path/to/train /path/to/calibration --model-out .local-eval/source-pipeline.npz
 
-uv run python scripts/source_pipeline_classifier.py predict \
+uv run python source-pipeline-2026-09-15/source_pipeline_classifier.py predict \
   .local-eval/source-pipeline.npz image.png
 ```
 
