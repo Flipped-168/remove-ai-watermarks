@@ -1429,39 +1429,26 @@ both backends explicitly (`tests/test_classify.py` pins the seam). User guide:
 
 ### Source-pipeline classifier
 
-[`source_classify.py`](../src/remove_ai_watermarks/source_classify.py) is a
-separate, lightweight OpenAI/Google/unknown source-export classifier. It fuses
-the existing 124-dimensional patch descriptor with the 768-dimensional
-phase-free spectrum in
+[`source_classify.py`](../src/remove_ai_watermarks/source_classify.py) provides
+the opt-in 10-provider source-pipeline classifier (`classify_source` and CLI
+command `classify-source`). It combines the 124-dimensional patch descriptor in
+[`_internal/forensic_124d.py`](../src/remove_ai_watermarks/_internal/forensic_124d.py)
+with the 768-dimensional phase-free spectrum in
 [`_internal/source_spectral.py`](../src/remove_ai_watermarks/_internal/source_spectral.py),
-then evaluates the frozen 892 -> 128 -> 64 -> 3 GELU MLP in NumPy. Provider
-labels clear independent calibrated margins; every other row is `unknown`.
-The NumPy decision treats values within `1e-5` of the stored margin as the
-inclusive training threshold, absorbing float32 BLAS differences; this matches
-the frozen training-runtime decisions on all 27,811 cached internal and
-external feature rows.
-
-The runtime pins both the immutable Hub revision and the NPZ SHA-256, loads
-with `allow_pickle=False`, and rejects any field, shape, class, activation, or
-non-finite-value drift. `RAIW_SOURCE_CLASSIFY_WEIGHTS` is the offline override.
-The `source-classify` extra adds `pixels` and Hugging Face Hub but no Torch or
-Transformers. `identify` never imports or runs this path. Its output names a
-complete source/export pipeline and is not SynthID detection. Unit contracts
-and the threshold mutation guard live in `tests/test_source_classify.py`;
-evaluation and attack limits live in
+expands the 892-d vector to 956-d with 64 cross-channel chroma, radial-slope,
+Nyquist-grid, and azimuthal-anisotropy features, and scores 10 global provider
+units and their subfamily sub-units in pure NumPy from a pickle-free `.npz`
+(`multi-provider-source-v3.npz`, `allow_pickle=False`, verified by SHA-256 from
+`wiltodelta/raiw-source-classify` or overridden via
+`RAIW_SOURCE_CLASSIFY_WEIGHTS`). It applies positive-part zero-inflation
+sub-unit pooling (`alpha * (s - base_offset)` only when `s > base_offset`),
+computes damped cross-AI margins ($\gamma = 0.60$), and runs a stacked Stage-2
+`HistGradientBoosting` tree head for version attribution. The `source-classify`
+extra adds `pixels` and Hugging Face Hub but no Torch or Transformers. It
+always sets `watermark_truth="unknown"` and is never imported by `identify`.
+Unit and mutation tests live in `tests/test_source_classify.py`; evaluation and
+attack limits live in [`source-classify-hf/README.md`](source-classify-hf/README.md) and
 [`synthid-classifiers.md`](synthid-classifiers.md).
-
-`source_classify_v2.py` provides a separate, opt-in `classify_image_source`
-entry point. Its NPZ schema contains only complex spectral filters, spatial
-templates, and thresholds; the runtime pins the Hub revision and SHA-256,
-rejects unknown fields and invalid shapes, and never loads pickles. The result
-has `watermark_truth="unknown"` even when a provider pattern matches. A
-simultaneous provider match abstains. `PROVIDERS` exports only the calibrated
-provider labels for callers that route processing from a source hint. Tests in
-`tests/test_source_classify_v2.py` cover the public seam and changed-threshold
-behavior; the [model card](image-source-hf/README.md) records the frozen
-aggregate evidence and limits. This does not change the earlier
-`classify_source` API.
 
 The CLIP loader suppresses discarded random parameter initialization with
 Transformers' `no_init_weights` context before applying the complete frozen

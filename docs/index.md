@@ -13,7 +13,7 @@ to run the tool. Use the maintainer references only when changing the code.
 | [Supported signals](supported-signals.md) | You need to know which visible marks, metadata formats, and invisible signals are covered. |
 | [Known limitations](known-limitations.md) | You need the quality, device, format, or verification boundaries. |
 | [Photo pixel classification](photo-classify.md) | You want `classify` / `classify_pixels`: AI versus camera, optional provider. |
-| [Source-pipeline classification](source-classify.md) | You want an abstaining OpenAI/Google/unknown export-pipeline signal after metadata removal. |
+| [Source-pipeline classification](source-classify.md) | You want an abstaining 10-provider export-pipeline and model-version signal after metadata removal. |
 | [Photo classifier training](photo-classify-training.md) | You need the retrain pack, public sources, and what is not published. |
 | [Scope, safety, and legal notes](legal-and-safety.md) | You need the intended use and legal context. |
 
@@ -43,7 +43,6 @@ The current behavior is defined by the code, tests, README, and user guides.
 - [Doubao reverse-alpha research](research-doubao-distillation.md)
 - [AI-generated image classifiers](ai-generated-image-classifiers.md) (photo AI-versus-camera freeze consumed by `classify_pixels`, not `identify`)
 - [Photo classifier Hugging Face card](photo-classify-hf/README.md) (Hub publication text of the 2026-08-31 freeze)
-- [New image-source classifier card](image-source-hf/README.md) (derivative weights, aggregate evaluation, and non-watermark claim)
 - [SynthID source classifiers](synthid-classifiers.md) (metadata-free OpenAI/Gemini source finding and provider-lineage experiments)
 - [Source-pipeline classifier model card](source-classify-hf/README.md) (published derivative weights, aggregate evaluation, and intended-use boundary)
 - [SynthID local detector research](synthid-detector-research.md)

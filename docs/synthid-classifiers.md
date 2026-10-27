@@ -116,10 +116,12 @@ SynthID payload.
 
 The next experiment trained a compact nonlinear head on the complete available
 private corpus, including target-provider exports, photographs, and foreign
-generator negatives. The corpus itself is not published. The released
-`source-pipeline-mlp.npz` is a derivative artifact containing only learned
-parameters, normalization constants, labels, and abstention thresholds; it
-contains no images, paths, image hashes, embeddings, or training catalog.
+generator negatives. The corpus itself is not published. That early 3-class
+MLP was subsequently superseded by the 10-provider `multi-provider-source-v3.npz`
+ensemble (`docs/source-classify-hf/`), a derivative artifact containing only
+learned parameters, normalization constants, tree arrays, labels, and
+abstention thresholds; it contains no images, paths, image hashes, embeddings,
+or training catalog.
 
 The model joins the 124-dimensional forensic descriptor with the
 768-dimensional phase-free spectral descriptor and applies a

@@ -14,8 +14,7 @@ High-level API (lazy, so ``import remove_ai_watermarks`` stays cheap)::
     raiw.remove_video_metadata("in.mp4", "out.mp4")     # verified metadata strip
     raiw.remove_video_invisible("in.mp4", "out.mp4")    # calibrated video-pixel regeneration
     raiw.remove_video_visible("in.mp4", "out.mp4")      # stable visible video-mark removal
-    raiw.classify_source("in.png")                      # source pipeline, not SynthID detection
-    raiw.classify_image_source("in.png")                # newer source patterns, not SynthID detection
+    raiw.classify_source("in.png")                      # 10-provider source pipeline + version, not SynthID detection
 
 For a provenance verdict use the ``identify`` submodule::
 
@@ -40,14 +39,12 @@ __version__ = "0.47.1"
 __all__ = [
     "BatchItemResult",
     "BatchSummary",
-    "ImageSourceClassification",
     "InvisibleOptions",
     "MetadataStripIncomplete",
     "RemoveAllResult",
     "SourceClassification",
     "VisibleRemovalResult",
     "__version__",
-    "classify_image_source",
     "classify_source",
     "identify_video",
     "inspect_video_metadata",
@@ -78,7 +75,6 @@ if TYPE_CHECKING:
         visible_provenance,
     )
     from remove_ai_watermarks.source_classify import SourceClassification, classify_source
-    from remove_ai_watermarks.source_classify_v2 import ImageSourceClassification, classify_image_source
     from remove_ai_watermarks.video import (
         identify_video,
         inspect_video_metadata,
@@ -113,10 +109,6 @@ def __getattr__(name: str) -> object:
         from remove_ai_watermarks import source_classify
 
         return getattr(source_classify, name)
-    if name in ("ImageSourceClassification", "classify_image_source"):
-        from remove_ai_watermarks import source_classify_v2
-
-        return getattr(source_classify_v2, name)
     if name in (
         "identify_video",
         "inspect_video_metadata",

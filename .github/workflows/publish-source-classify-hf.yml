@@ -10,9 +10,9 @@ on:
         description: "Type publish"
         required: true
       weights_tag:
-        description: "GitHub Release tag holding source-pipeline-mlp.npz"
+        description: "GitHub Release tag holding multi-provider-source-v3.npz"
         required: true
-        default: source-classify-freeze-2026-09-16-r2
+        default: source-classify-freeze-2026-10-27
 
 jobs:
   publish:
@@ -37,16 +37,16 @@ jobs:
           mkdir -p weights
           gh release download "$TAG" \
             --repo "${{ github.repository }}" \
-            --pattern source-pipeline-mlp.npz \
+            --pattern multi-provider-source-v3.npz \
             --dir weights
-          test -s weights/source-pipeline-mlp.npz
+          test -s weights/multi-provider-source-v3.npz
 
       - name: Verify the frozen artifact
         run: |
           set -euo pipefail
           expected="$(jq -r .artifact_sha256 docs/source-classify-hf/metrics.json)"
           test "${#expected}" -eq 64
-          echo "$expected  weights/source-pipeline-mlp.npz" | sha256sum --check
+          echo "$expected  weights/multi-provider-source-v3.npz" | sha256sum --check
 
       - name: Publish to Hugging Face
         env:

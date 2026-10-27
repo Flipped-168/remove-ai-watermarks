@@ -20,7 +20,9 @@ from hf_publish import publish_model_folder
 log = logging.getLogger(__name__)
 
 HUB_REPO = "wiltodelta/raiw-source-classify"
-MODEL_FILE = "source-pipeline-mlp.npz"
+RETIRED_HUB_REPOS = ("wiltodelta/openai-google-image-source-classifier",)
+MODEL_FILE = "multi-provider-source-v3.npz"
+RETIRED_FILES = ("source-pipeline-mlp.npz", "openai-google-source-v1.npz")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CARD_DIR = REPO_ROOT / "docs" / "source-classify-hf"
 PUBLIC_FILES = ("README.md", "metrics.json", MODEL_FILE)
@@ -42,14 +44,21 @@ def stage_release(dest: Path, src: Path) -> None:
 
 
 def publish(stage: Path, *, token: str, message: str) -> str:
-    """Upload the exact staged allowlist and return the Hub revision."""
-    return publish_model_folder(
+    """Upload the exact staged allowlist, delete retired weights/repos, and return the Hub revision."""
+    from huggingface_hub import HfApi
+
+    revision = publish_model_folder(
         stage,
         repo_id=HUB_REPO,
         token=token,
         message=message,
         allow_patterns=PUBLIC_FILES,
+        delete_patterns=RETIRED_FILES,
     )
+    api = HfApi(token=token)
+    for retired_repo in RETIRED_HUB_REPOS:
+        api.delete_repo(retired_repo, repo_type="model", missing_ok=True)
+    return revision
 
 
 def main() -> int:

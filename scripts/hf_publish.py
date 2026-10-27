@@ -16,6 +16,7 @@ def publish_model_folder(
     token: str,
     message: str,
     allow_patterns: Iterable[str],
+    delete_patterns: Iterable[str] | None = None,
 ) -> str:
     """Upload an explicit file allowlist and return the Hub revision."""
     from huggingface_hub import HfApi, create_repo
@@ -27,5 +28,6 @@ def publish_model_folder(
         repo_type="model",
         commit_message=message,
         allow_patterns=list(allow_patterns),
+        delete_patterns=list(delete_patterns) if delete_patterns is not None else None,
     )
     return getattr(commit, "oid", "") or ""

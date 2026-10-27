@@ -143,9 +143,10 @@ entries enter the watermark inventory, while a fingerprint remains a
 re-linkability warning, never selects pixel regeneration, and does not suppress
 independent SynthID evidence.
 
-The opt-in `classify_source` API is not an `identify` signal. It can suggest an
-OpenAI or Google source/export pipeline after metadata removal, but it neither
-detects nor decodes a watermark and never changes the provenance verdict.
+The opt-in `classify_source` API (and CLI `classify-source`) is not an
+`identify` signal. It can suggest one of 11 AI source/export pipelines and its
+model-version subfamily after metadata removal, but it neither detects nor
+decodes a watermark and never changes the provenance verdict.
 
 ## File and container formats
 

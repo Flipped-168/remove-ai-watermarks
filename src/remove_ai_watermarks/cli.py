@@ -1606,6 +1606,47 @@ def cmd_classify(source: Path, as_json: bool) -> None:
     console.print("  identify is unchanged. This command does not run cleanup and does not prove a file is clean.")
 
 
+# ── Multi-provider source-pipeline classification (opt-in, never a tail of identify) ──
+@main.command("classify-source")
+@click.argument("source", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--json", "as_json", is_flag=True, help="Emit the source classification as JSON.")
+def cmd_classify_source(source: Path, as_json: bool) -> None:
+    """Classify an image's likely AI provider and model version from pixels.
+
+    Runs the abstaining 10-provider source-pipeline classifier and stacked
+    Stage-2 version head. This is not provenance and does not detect or verify
+    SynthID. identify never starts this command.
+    Install: pip install 'remove-ai-watermarks[source-classify]'
+    """
+    from remove_ai_watermarks import source_classify
+
+    if not source_classify.is_available():
+        console.print(
+            "Error: the source-classification dependencies are not installed.\n"
+            f"  Install them with: pip install {source_classify.SOURCE_CLASSIFY_EXTRA}"
+        )
+        raise SystemExit(1)
+
+    source = _validate_image(source)
+    try:
+        result = source_classify.classify_source(source)
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if as_json:
+        click.echo(json.dumps(result.to_dict(), indent=2))
+        return
+
+    _banner()
+    console.print("\n  Source-pipeline classification (not provenance and not SynthID detection)")
+    console.print(f"  Label: {result.label}")
+    console.print(f"  Version subfamily: {result.version_subfamily or 'none'}")
+    console.print(f"  Reason: {result.reason}")
+    console.print(f"  Confidence: {result.confidence:.4f}")
+    console.print(f"  Watermark truth: {result.watermark_truth}")
+    console.print("  identify is unchanged. This command does not detect SynthID or prove a file is clean.")
+
+
 # ── Combined "all" mode ──
 @main.command("all")
 @click.argument("source", type=click.Path(exists=True, dir_okay=False, path_type=Path))

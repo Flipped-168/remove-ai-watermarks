@@ -1,22 +1,132 @@
 {
-  "claim": "abstaining OpenAI/Google source-pipeline classification; not SynthID detection",
-  "artifact_sha256": "6430b0738869ff07b6845b7c6149c2a83bc3f3785878082886c241c6f7ca0c4a",
-  "classes": ["openai", "google", "unknown"],
+  "claim": "abstaining 10-provider source-pipeline classification with version subfamily attribution; not SynthID detection",
+  "schema": "multi-provider-source-v3",
+  "artifact_file": "multi-provider-source-v3.npz",
+  "artifact_sha256": "7a550c2613af99ea784d2f25396776de0aa4ecf2efabe937054679f620b5ee5c",
+  "feature_dimension": 956,
+  "stacked_stage2_dimension": 999,
+  "classes": [
+    "openai",
+    "google",
+    "bytedance",
+    "flux",
+    "stable_diffusion",
+    "meta",
+    "midjourney",
+    "ideogram",
+    "firefly",
+    "xai",
+    "unknown"
+  ],
+  "corpus_counts": {
+    "total": 36761,
+    "train": 23775,
+    "calibration": 5591,
+    "test": 7395
+  },
   "locked_internal_test": {
-    "n": 5369,
-    "confusion_actual_by_predicted": [[230, 6, 145], [0, 217, 160], [41, 24, 4546]],
-    "recall": {"openai": 0.6036745407, "google": 0.5755968170, "unknown": 0.9859032748},
-    "precision": {"openai": 0.8487084871, "google": 0.8785425101, "unknown": 0.9371263657}
+    "n": 7395,
+    "unknown_specificity": 0.9894863322319015,
+    "unknown_fpr": 0.010513667768098528,
+    "photo_fpr": 0.012506797172376292,
+    "structured_fpr": 0.008086253369272238,
+    "aggregate_target_recall": 0.6106738809640925,
+    "recall": {
+      "openai": 0.7033158813263525,
+      "google": 0.7215799614643545,
+      "bytedance": 0.5902964959568733,
+      "flux": 0.4743243243243243,
+      "stable_diffusion": 0.44836272040302266,
+      "meta": 0.776595744680851,
+      "midjourney": 0.6493506493506493,
+      "ideogram": 0.3055555555555556,
+      "firefly": 0.3132530120481928,
+      "xai": 0.1875
+    },
+    "precision": {
+      "openai": 0.9641148325358851,
+      "google": 0.9553571428571429,
+      "bytedance": 0.9605263157894737,
+      "flux": 0.9410187667560321,
+      "stable_diffusion": 0.9518716577540107,
+      "meta": 0.9012345679012346,
+      "midjourney": 0.6024096385542169,
+      "ideogram": 0.8461538461538461,
+      "firefly": 1.0,
+      "xai": 0.75
+    },
+    "real_variety_specificity": {
+      "photo": 0.9874932028276237,
+      "photo_retouched": 0.9948453608247423,
+      "vector": 1.0,
+      "game_art": 0.990990990990991,
+      "digital_art": 0.9936034115138592,
+      "interface": 1.0,
+      "diagram": 0.9826839826839827,
+      "document": 1.0,
+      "stress_recompressed": 0.970873786407767,
+      "foreign_ai": 1.0
+    }
   },
-  "public_external_originals": {
-    "dataset": "bigdatamark/synthid-research",
-    "n": 900,
-    "confusion_actual_by_predicted": [[206, 0, 94], [0, 244, 56], [0, 3, 297]],
-    "recall": {"openai": 0.6866666667, "google": 0.8133333333, "unknown": 0.99},
-    "precision": {"openai": 1.0, "google": 0.9878542510, "unknown": 0.6644295302}
+  "external_blind_selective_v8_real_varieties": {
+    "total_evaluated": 2267,
+    "total_false_positives": 15,
+    "overall_fpr": 0.006616674018526687,
+    "overall_specificity": 0.9933833259814733,
+    "per_variety": {
+      "photo": {
+        "evaluated": 450,
+        "false_positives": 4,
+        "fpr": 0.008888888888888889,
+        "specificity": 0.9911111111111112
+      },
+      "vector": {
+        "evaluated": 332,
+        "false_positives": 0,
+        "fpr": 0.0,
+        "specificity": 1.0
+      },
+      "game_art": {
+        "evaluated": 230,
+        "false_positives": 7,
+        "fpr": 0.030434782608695653,
+        "specificity": 0.9695652173913043
+      },
+      "interface": {
+        "evaluated": 342,
+        "false_positives": 2,
+        "fpr": 0.005847953216374269,
+        "specificity": 0.9941520467836257
+      },
+      "diagram": {
+        "evaluated": 305,
+        "false_positives": 1,
+        "fpr": 0.003278688524590164,
+        "specificity": 0.9967213114754099
+      },
+      "document": {
+        "evaluated": 308,
+        "false_positives": 0,
+        "fpr": 0.0,
+        "specificity": 1.0
+      },
+      "stress_recompressed": {
+        "evaluated": 300,
+        "false_positives": 1,
+        "fpr": 0.0033333333333333335,
+        "specificity": 0.9966666666666667
+      }
+    }
   },
-  "selection": {
-    "minimum_calibration_precision": {"openai": 0.99, "google": 0.95},
-    "maximum_calibration_unknown_false_positive_rate": 0.01
+  "stage2_version_accuracy": {
+    "openai": 0.856020942408377,
+    "google": 0.9335260115606936,
+    "bytedance": 0.8814016172506739,
+    "flux": 0.8972972972972973,
+    "stable_diffusion": 0.783375314861461,
+    "midjourney": 0.8961038961038961,
+    "ideogram": 0.625,
+    "firefly": 0.963855421686747,
+    "xai": 0.6875
   }
 }
