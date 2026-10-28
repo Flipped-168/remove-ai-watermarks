@@ -372,6 +372,9 @@ def test_identify_says_when_the_visible_detectors_could_not_run(
 
     from remove_ai_watermarks.cli import main
 
+    # This tests the real visible detector, without loading unrelated model weights.
+    monkeypatch.setattr("remove_ai_watermarks.trustmark_detector.is_available", lambda: False)
+
     source = tmp_path / "image.png"
     source.write_bytes((ROOT / "data" / "calibration" / "gemini" / "gemini_black_2048.png").read_bytes())
 

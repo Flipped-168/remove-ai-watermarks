@@ -1,22 +1,139 @@
 {
-  "claim": "abstaining OpenAI/Google source-pipeline classification; not SynthID detection",
-  "artifact_sha256": "6430b0738869ff07b6845b7c6149c2a83bc3f3785878082886c241c6f7ca0c4a",
-  "classes": ["openai", "google", "unknown"],
+  "claim": "abstaining 10-provider source-pipeline classification with version subfamily attribution; not SynthID detection",
+  "schema": "multi-provider-source-v3",
+  "artifact_file": "multi-provider-source-v3.npz",
+  "artifact_sha256": "e5264354edb0109461e3c4988e3267903a8a2a0648b05e81705dee298be97806",
+  "feature_dimension": 956,
+  "stacked_stage2_dimension": 999,
+  "classes": [
+    "openai",
+    "google",
+    "bytedance",
+    "flux",
+    "stable_diffusion",
+    "meta",
+    "midjourney",
+    "ideogram",
+    "firefly",
+    "xai",
+    "unknown"
+  ],
+  "corpus_counts": {
+    "total": 40974,
+    "train": 25790,
+    "calibration": 6708,
+    "test": 8476
+  },
   "locked_internal_test": {
-    "n": 5369,
-    "confusion_actual_by_predicted": [[230, 6, 145], [0, 217, 160], [41, 24, 4546]],
-    "recall": {"openai": 0.6036745407, "google": 0.5755968170, "unknown": 0.9859032748},
-    "precision": {"openai": 0.8487084871, "google": 0.8785425101, "unknown": 0.9371263657}
+    "n": 8476,
+    "unknown_specificity": 0.9968253968253968,
+    "unknown_fpr": 0.0031746031746031746,
+    "photo_fpr": 0.0036646816307833257,
+    "structured_fpr": 0.0027014858171994597,
+    "aggregate_target_recall": 0.5329562223315298,
+    "recall": {
+      "openai": 0.650087260034904,
+      "google": 0.5606936416184971,
+      "bytedance": 0.48247978436657685,
+      "flux": 0.41216216216216217,
+      "stable_diffusion": 0.4811083123425693,
+      "meta": 0.776595744680851,
+      "midjourney": 0.5454545454545454,
+      "ideogram": 0.3472222222222222,
+      "firefly": 0.21686746987951808,
+      "xai": 0.14583333333333334
+    },
+    "precision": {
+      "openai": 0.9662775616083009,
+      "google": 0.9748743718592965,
+      "bytedance": 0.988950276243094,
+      "flux": 0.9775641025641025,
+      "stable_diffusion": 0.9597989949748744,
+      "meta": 0.948051948051948,
+      "midjourney": 0.84,
+      "ideogram": 0.78125,
+      "firefly": 0.8571428571428571,
+      "xai": 0.7777777777777778
+    },
+    "real_variety_specificity": {
+      "photo": 0.9963353183692167,
+      "photo_retouched": 0.9968847352024922,
+      "classical_inpaint": 1.0,
+      "digital_art": 0.9977324263038548,
+      "game_art": 0.9923664122137404,
+      "vector": 1.0,
+      "interface": 0.9941520467836257,
+      "diagram": 0.9897959183673469,
+      "chart_data_viz": 1.0,
+      "technical_architecture": 1.0,
+      "procedural_graphic": 1.0,
+      "document": 1.0,
+      "gov_scientific_doc": 1.0,
+      "receipt_invoice": 1.0,
+      "print_publishing": 1.0,
+      "stress_recompressed": 0.9902912621359223,
+      "foreign_ai": 1.0
+    }
   },
-  "public_external_originals": {
-    "dataset": "bigdatamark/synthid-research",
-    "n": 900,
-    "confusion_actual_by_predicted": [[206, 0, 94], [0, 244, 56], [0, 3, 297]],
-    "recall": {"openai": 0.6866666667, "google": 0.8133333333, "unknown": 0.99},
-    "precision": {"openai": 1.0, "google": 0.9878542510, "unknown": 0.6644295302}
+  "external_blind_selective_v8_real_varieties": {
+    "total_evaluated": 2267,
+    "total_false_positives": 8,
+    "overall_fpr": 0.0035288928098808998,
+    "overall_specificity": 0.9964711071901191,
+    "per_variety": {
+      "photo": {
+        "evaluated": 450,
+        "false_positives": 3,
+        "fpr": 0.006666666666666667,
+        "specificity": 0.9933333333333333
+      },
+      "vector": {
+        "evaluated": 332,
+        "false_positives": 0,
+        "fpr": 0.0,
+        "specificity": 1.0
+      },
+      "game_art": {
+        "evaluated": 230,
+        "false_positives": 4,
+        "fpr": 0.017391304347826087,
+        "specificity": 0.9826086956521739
+      },
+      "interface": {
+        "evaluated": 342,
+        "false_positives": 0,
+        "fpr": 0.0,
+        "specificity": 1.0
+      },
+      "diagram": {
+        "evaluated": 305,
+        "false_positives": 0,
+        "fpr": 0.0,
+        "specificity": 1.0
+      },
+      "document": {
+        "evaluated": 308,
+        "false_positives": 0,
+        "fpr": 0.0,
+        "specificity": 1.0
+      },
+      "stress_recompressed": {
+        "evaluated": 300,
+        "false_positives": 1,
+        "fpr": 0.0033333333333333335,
+        "specificity": 0.9966666666666667
+      }
+    }
   },
-  "selection": {
-    "minimum_calibration_precision": {"openai": 0.99, "google": 0.95},
-    "maximum_calibration_unknown_false_positive_rate": 0.01
+  "stage2_version_accuracy": {
+    "openai": 0.868237347294939,
+    "google": 0.9479768786127167,
+    "bytedance": 0.8787061994609164,
+    "flux": 0.9283783783783784,
+    "stable_diffusion": 0.853904282115869,
+    "midjourney": 0.961038961038961,
+    "ideogram": 0.5972222222222222,
+    "firefly": 1.0,
+    "xai": 0.6458333333333334
   }
 }

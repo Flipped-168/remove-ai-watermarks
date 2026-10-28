@@ -99,7 +99,7 @@ _REFUSAL_MARKERS = (
 )
 
 _INDETERMINATE_MARKERS = (
-    "Something went wrong. Please try again. If the issue persists, contact support.",
+    "Something went wrong. Please try again. If the issue persists, contact support",
     "Please sign in before detection.",
 )
 

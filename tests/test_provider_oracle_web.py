@@ -151,6 +151,15 @@ def test_openai_provider_error_is_a_settled_indeterminate_result() -> None:
     assert web.parse_provider_result("openai-web", page_text).watermark_result == "indeterminate"
 
 
+def test_openai_link_wrapped_provider_error_is_settled() -> None:
+    page_text = (
+        "Something went wrong. Please try again. If the issue persists, contact support\n(opens in a new window)\n."
+    )
+
+    assert web._settled("openai-web", page_text)
+    assert web.parse_provider_result("openai-web", page_text).watermark_result == "indeterminate"
+
+
 @pytest.mark.parametrize(
     ("surface", "ready_state"),
     [

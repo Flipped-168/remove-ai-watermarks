@@ -826,13 +826,15 @@ class TestIdentifyRealSamples:
         ],
     )
     def test_gemini_api_image_carries_google_c2pa_and_synthid(self, name: str):
-        # Real Gemini API outputs (2026-09-24), one per image model: valid Google C2PA
-        # with a SynthID action and no visible sparkle.
+        # Real Gemini API outputs (2026-09-24), one per image model: signed Google C2PA
+        # with a SynthID action and no visible sparkle. Trust and certificate expiry
+        # depend on the validation date; signature and asset integrity are stable.
         r = identify(SAMPLES_DIR / name, check_visible=True, check_invisible=False)
         assert r.is_ai_generated is True
         assert r.ai_source_kind == "generated"
         assert r.platform == "Google (Gemini / Imagen)"
-        assert r.c2pa_validation["state"] == "Valid"
+        assert r.c2pa_validation["integrity"] == "valid"
+        assert r.c2pa_validation["signature"] == "valid"
         assert "SynthID watermark (present according to Google LLC provenance)" in r.watermarks
         assert not any("sparkle" in watermark.lower() for watermark in r.watermarks)
 
@@ -893,13 +895,15 @@ class TestIdentifyRealSamples:
     )
     def test_google_photos_ai_edit_reports_synthid(self, path: Path):
         # Real Google Photos iOS AI edits (Ask, eraser and two others, 2026-09-23 to
-        # 2026-09-25): valid Google C2PA signed "Google Photos", no SynthID action.
+        # 2026-09-25): Google C2PA signed "Google Photos", no SynthID action.
+        # Verify signature and asset integrity separately from trust and expiry.
         # Google's checker found SynthID on all four captures.
         r = identify(path, check_visible=False, check_invisible=False)
         assert r.is_ai_generated is True
         assert r.ai_source_kind == "enhanced"
         assert r.platform == "Google Photos (AI edit)"
-        assert r.c2pa_validation["state"] == "Valid"
+        assert r.c2pa_validation["integrity"] == "valid"
+        assert r.c2pa_validation["signature"] == "valid"
         assert any("SynthID" in watermark for watermark in r.watermarks)
         assert any("Google Photos AI edit" in caveat for caveat in r.caveats)
 

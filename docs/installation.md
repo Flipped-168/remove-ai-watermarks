@@ -129,7 +129,7 @@ application actually uses:
 | `trustmark` | Adobe TrustMark detection | trustmark | Yes |
 | `classify` | Metadata-free photo AI-versus-camera classifier plus gated provider | `pixels`, Torch, Transformers | Yes |
 | `classify-onnx` | Optional CPU-only ONNX vision runtime for `classify` | `classify`, ONNX Runtime | Yes |
-| `source-classify` | Abstaining OpenAI/Google/unknown source-export classifier, not SynthID detection | `pixels`, Hugging Face Hub | Model download, no Torch |
+| `source-classify` | Abstaining 10-provider source-export and model-version classifier, not SynthID detection | `pixels`, Hugging Face Hub | Model download, no Torch |
 | `diffusion` | Torch and Diffusers runtime; video SynthID regeneration | `pixels`, Torch, Diffusers | Yes |
 | `migan` | MI-GAN ONNX fill backend | `visible`, ONNX Runtime | Model download, no Torch |
 | `lama` | big-LaMa ONNX fill backend | `visible`, ONNX Runtime | Model download, no Torch |

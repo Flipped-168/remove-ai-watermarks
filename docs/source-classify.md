@@ -1,13 +1,14 @@
 # Source-pipeline classification
 
-`classify_source` is the earlier, opt-in, metadata-free pixel classifier for images that
-still resemble an original provider export. It returns `openai`, `google`, or
-an explicit `unknown` abstention.
+`classify_source` (and the CLI command `classify-source`) is an opt-in,
+metadata-free pixel source-pipeline classifier across **10 AI provider families**
+with Stage-2 model-version attribution.
 
 This is not a SynthID detector. It does not decode or verify a watermark
-payload, and it must not be used to claim that SynthID is present or absent.
-The model describes the complete source/export pipeline, where renderer,
-geometry, encoding, post-processing, and watermark state can be confounded.
+payload, and it must not be used to claim that SynthID is present or absent
+(`watermark_truth="unknown"`). The model describes the complete source/export
+pixel pipeline, where renderer, geometry, encoding, post-processing, and
+watermark state can be confounded.
 
 Install the lightweight runtime:
 
@@ -15,48 +16,47 @@ Install the lightweight runtime:
 uv add "remove-ai-watermarks[source-classify]"
 ```
 
-Call the Python API explicitly:
+It evaluates 956-dimensional forensic, spectral, and cross-channel chroma/grid
+features (`124-d` spatial patch residuals + `768-d` phase-free log-power
+spectrum + `64-d` radial-slope, Nyquist-grid, and azimuthal-anisotropy terms)
+through 10 provider specialists and their subfamily sub-specialists with
+positive-part zero-inflation sub-unit pooling, damped cross-provider margin
+suppression ($\gamma = 0.60$), and stacked Stage-2 version classifiers.
+
+It routes across all 10 canonical AI provider classes (`openai`, `google`,
+`bytedance`, `flux`, `stable_diffusion`, `meta`, `midjourney`, `ideogram`,
+`firefly`, `xai`) or abstains as `unknown`.
+
+Call the CLI command or Python API explicitly:
+
+```bash
+remove-ai-watermarks classify-source metadata-stripped.png
+remove-ai-watermarks classify-source metadata-stripped.png --json
+```
 
 ```python
 import remove_ai_watermarks as raiw
 
 result = raiw.classify_source("metadata-stripped.png")
-print(result.label)       # "openai" | "google" | "unknown"
-print(result.reason)      # "classified" | "abstained" | "feature_unavailable"
-print(result.margins)     # provider margins before thresholding
-print(result.thresholds)  # frozen provider thresholds
+print(result.label)              # one of the 10 providers or "unknown"
+print(result.version_subfamily)  # e.g. "google:gemini_3_pro_image", "openai:gpt_image_1_5", or None
+print(result.reason)             # "classified" | "abstained" | "feature_unavailable"
+print(result.margins)            # provider margins before thresholding
+print(result.thresholds)         # calibrated provider thresholds
+print(result.watermark_truth)    # always "unknown"
 ```
 
 `feature_unavailable` is returned for images below the required 256x256
-geometry or for a degenerate feature vector. `abstained` means neither provider
-cleared its independent calibrated margin. Both are honest `unknown` results.
+geometry or for a degenerate feature vector. `abstained` means no active
+provider cleared its calibrated damped margin. Both are honest `unknown`
+results.
 
 The first call downloads the exact pinned revision of
-[`wiltodelta/raiw-source-classify`](https://huggingface.co/wiltodelta/raiw-source-classify).
-Set `RAIW_SOURCE_CLASSIFY_WEIGHTS` to the NPZ itself or a directory containing
-`source-pipeline-mlp.npz` for an offline deployment.
+[`wiltodelta/raiw-source-classify`](https://huggingface.co/wiltodelta/raiw-source-classify)
+(`multi-provider-source-v3.npz`, verified by SHA-256). Set
+`RAIW_SOURCE_CLASSIFY_WEIGHTS` to the `.npz` file itself or its parent directory
+for an offline deployment.
 
-The model is useful as a routing suggestion for a processing workflow or as one
-probabilistic signal in a broader forensic report. Do not use it as evidence of
-authorship, fraud, policy compliance, provenance, or watermark presence. The
-published model card records the evaluation and robustness limits.
-
-## New image-source classifier
-
-`classify_image_source` is a separate, frozen model that incorporates selected
-spectral and spatial evidence from the earlier research. It does not silently
-change `classify_source` or its thresholds. Call it explicitly:
-
-```python
-result = raiw.classify_image_source("metadata-stripped.png")
-print(result.label)             # "openai" | "google" | "unknown"
-print(result.reason)            # "classified" | "abstained" | "conflict" | "feature_unavailable"
-print(result.watermark_truth)   # always "unknown"
-```
-
-Its first call downloads a hash-verified artifact from the immutable revision
-of [`wiltodelta/openai-google-image-source-classifier`](https://huggingface.co/wiltodelta/openai-google-image-source-classifier).
-For offline use, set `RAIW_IMAGE_SOURCE_WEIGHTS` to the NPZ file or its
-directory. It classifies likely export-source patterns in decoded pixels, not
-SynthID presence. The [model card](image-source-hf/README.md) records its
-aggregate tests and limitations.
+This classifier is never invoked by `identify`, `has_invisible_target`, or `all`.
+The [model card](source-classify-hf/README.md) records the evaluation and
+robustness limits.

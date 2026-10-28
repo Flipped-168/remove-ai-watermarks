@@ -110,6 +110,29 @@ files.
 Guide: [photo pixel classification](photo-classify.md). Hub card:
 [photo-classify-hf/README.md](photo-classify-hf/README.md).
 
+## Classify source/export pipeline from pixels (opt-in)
+
+To classify an image's likely AI generation/export pipeline and model version
+subfamily from pixels after metadata removal, install the `source-classify`
+extra and run `classify-source`. `identify` never runs this command, and it is
+not a SynthID detector:
+
+```bash
+uv tool install --force "remove-ai-watermarks[source-classify]"
+remove-ai-watermarks classify-source image.png
+remove-ai-watermarks classify-source image.png --json
+```
+
+`classify-source` evaluates all 10 provider classes (`openai`, `google`,
+`bytedance`, `flux`, `stable_diffusion`, `meta`, `midjourney`, `ideogram`,
+`firefly`, `xai`) and abstains as `unknown` when no provider clears its
+calibrated margin threshold. When a provider is accepted, the stacked Stage-2
+head also reports `version_subfamily` (for example
+`google:gemini_3_pro_image`, `openai:gpt_image_1_5`, `flux:flux_2_pro`,
+`stable_diffusion:sdxl`, `midjourney:v6_1`). `watermark_truth` is always
+`"unknown"`. Guide:
+[source-pipeline classification](source-classify.md).
+
 ## Remove known visible marks
 
 Install `remove-ai-watermarks[visible]` before using `visible` or `erase`.

@@ -50,13 +50,9 @@ explicitly names a tracked canonical result.
 | `visible_recall_sample.py` | Build an unbiased blinded sample for recall measurement. |
 | `visible_sheets.py` | Build blinded contact sheets for relaxation candidates. |
 | `watermark_benchmark_cohort.py` | Build the deterministic synthetic DWT-DCT and TrustMark cohort consumed by `watermark_benchmark.py`. |
-| `spectral_pipeline_probe.py` | Measure a prompt-grouped, phase-free spectral source-pipeline hypothesis without presenting it as SynthID detection. |
-| `source_pipeline_classifier.py` | Train or run an abstaining OpenAI/Google/unknown source-export classifier; research-only and not SynthID detection. |
 | `watermark_benchmark_real_cohort.py` | Build a publication-cleared, provider-paired and content-stratified real-image cohort. |
-| `retrain_photo_classify.py` | CPU-retrain the 2026-08-31 photo heads from a sha256-keyed cache pack, no images. |
 | `publish_photo_classify_hf.py` | Upload the photo-classify card and freeze weights to Hugging Face `wiltodelta/raiw-photo-classify`. Manual; the Action `publish-photo-classify-hf.yml` is the write-token path. |
-| `publish_source_classify_hf.py` | Upload the derivative source-pipeline model and its public card to Hugging Face `wiltodelta/raiw-source-classify`. Manual; the Action `publish-source-classify-hf.yml` is the write-token path. |
-| `publish_image_source_hf.py` | Upload only the hash-verified new image-source model and public card to `wiltodelta/openai-google-image-source-classifier`. Manual; `publish-image-source-hf.yml` is the write-token path. |
+| `publish_source_classify_hf.py` | Upload the derivative 10-provider source-pipeline model (`multi-provider-source-v3.npz`) and its public card to Hugging Face `wiltodelta/raiw-source-classify`. Manual; the Action `publish-source-classify-hf.yml` is the write-token path. |
 | `verify_engine_selection_fixtures.py` | Verify hashes, dimensions, and prompt pairing in the tracked auto-engine content matrix. |
 
 ## Research and diagnostic prototypes
@@ -68,6 +64,8 @@ explicitly names a tracked canonical result.
 | `analyze_engine_selection_study.py` | Reduce engine-study output to paired deltas and exact sign tests. |
 | `infer_text_lines.py` | Draft stable source-text lines without modifying pixels. |
 | `qwen_scrub_prototype.py` | Probe low-strength Qwen regeneration on a GPU. |
+| `restore_source_band.py` | Reproduce the qualified model-independent two-seed Chroma frequency-band selector for 1024 x 1024 brothy-bowl photographs. |
+| `restore_source_detail.py` | Reproduce the qualified Qwen high-frequency source-detail compositor for simple product photographs. |
 | `selective_text_restoration.py` | Evaluate text restoration over a scrubbed image. |
 | `synthid_pixel_probe.py` | Run the experimental local SynthID carrier probe. |
 | `rewatermarking_study.py` | Measure same-encoder message replacement and decoded-pixel fidelity on publication-cleared images with the open DWT-DCT, TrustMark, and VideoSeal image encoders. |

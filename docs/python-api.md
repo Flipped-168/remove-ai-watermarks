@@ -20,19 +20,19 @@ Install `remove-ai-watermarks[source-classify]`, then call the explicit API:
 import remove_ai_watermarks as raiw
 
 result = raiw.classify_source("metadata-stripped.png")
-print(result.label)   # "openai" | "google" | "unknown"
-print(result.reason)  # "classified" | "abstained" | "feature_unavailable"
+print(result.label)              # one of 10 providers or "unknown"
+print(result.version_subfamily)  # Stage-2 model subfamily or None
+print(result.reason)             # "classified" | "abstained" | "feature_unavailable"
+print(result.watermark_truth)    # always "unknown"
 ```
 
-This signal classifies a complete image-generation and export pipeline. It is
-not a SynthID detector and does not establish watermark presence or absence.
-See [source-pipeline classification](source-classify.md) for the result fields,
-model pin, evaluation boundary, and offline weights override.
-
-For the newer, separately pinned model, call `raiw.classify_image_source(path)`.
-It returns `label`, `reason`, branch `scores`, and
-`watermark_truth="unknown"`. A simultaneous provider match abstains with
-`reason="conflict"`; it is never reported as SynthID evidence.
+This signal classifies a complete image-generation and export
+pipeline across 10 provider families (`openai`, `google`, `bytedance`, `flux`,
+`stable_diffusion`, `meta`, `midjourney`, `ideogram`, `firefly`, `xai`); it is
+not a SynthID detector and does not establish watermark
+presence or absence. See [source-pipeline classification](source-classify.md)
+for the result fields, model pin, evaluation boundary, and offline weights
+override.
 
 ## Remove visible marks
 

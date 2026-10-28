@@ -95,9 +95,9 @@ later freeze cannot silently change installed clients.
 
 The separate `wiltodelta/raiw-source-classify` model is published with
 `.github/workflows/publish-source-classify-hf.yml`. The workflow downloads the
-derivative `source-pipeline-mlp.npz` artifact from the declared GitHub model
-freeze, verifies its SHA-256, and uploads only that file plus the tracked card
-and aggregate metrics under `docs/source-classify-hf/`. The private corpus,
+derivative `multi-provider-source-v3.npz` artifact from the declared GitHub
+model freeze, verifies its SHA-256, and uploads only that file plus the tracked
+card and aggregate metrics under `docs/source-classify-hf/`. The private corpus,
 catalog, paths, hashes, embeddings, and feature caches are outside this flow.
 
 The workflow is manual and requires the model-freeze release tag plus an
@@ -108,12 +108,6 @@ non-prerelease `v*` tags, so model-only prereleases cannot enter PyPI or the
 package fan-out. A draft release keeps its target commit when published; target
 the commit containing those guards before creating a model-only release, not
 merely the then-current `main` after the draft already exists.
-
-The newer `wiltodelta/openai-google-image-source-classifier` uses the separate
-`publish-image-source-hf.yml` workflow. Its release asset is only the
-hash-verified derivative `openai-google-source-v1.npz`; the workflow uploads
-that artifact plus `docs/image-source-hf/README.md` and `metrics.json`. The
-training corpus does not enter the library checkout or this release.
 
 If a distribution job fails because a repository or Hugging Face credential is
 invalid, rotate the corresponding GitHub secret and rerun the failed job. A

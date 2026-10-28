@@ -638,6 +638,11 @@ expired original cannot distinguish the negative profile mutation: it returns
 checks and use the generated certificate for that mutation. Expiry does not
 invalidate a signature made inside validity or prove that its asset changed.
 
+The fixed Google image and Photos attribution fixtures assert cryptographic
+signature and asset integrity separately from the overall reader state, which
+can change as their certificates age. Controlled validation tests continue to
+cover trust, expiry, revocation, and the overall state independently.
+
 Microsoft's same fixtures also report `claim.malformed` under the newer SDK.
 Their soft-binding block stores a GUID as a text string, whereas
 [C2PA 2.4, section 18.10](https://spec.c2pa.org/specifications/specifications/2.4/specs/C2PA_Specification.html#soft_binding_assertion)
@@ -1424,39 +1429,26 @@ both backends explicitly (`tests/test_classify.py` pins the seam). User guide:
 
 ### Source-pipeline classifier
 
-[`source_classify.py`](../src/remove_ai_watermarks/source_classify.py) is a
-separate, lightweight OpenAI/Google/unknown source-export classifier. It fuses
-the existing 124-dimensional patch descriptor with the 768-dimensional
-phase-free spectrum in
+[`source_classify.py`](../src/remove_ai_watermarks/source_classify.py) provides
+the opt-in 10-provider source-pipeline classifier (`classify_source` and CLI
+command `classify-source`). It combines the 124-dimensional patch descriptor in
+[`_internal/forensic_124d.py`](../src/remove_ai_watermarks/_internal/forensic_124d.py)
+with the 768-dimensional phase-free spectrum in
 [`_internal/source_spectral.py`](../src/remove_ai_watermarks/_internal/source_spectral.py),
-then evaluates the frozen 892 -> 128 -> 64 -> 3 GELU MLP in NumPy. Provider
-labels clear independent calibrated margins; every other row is `unknown`.
-The NumPy decision treats values within `1e-5` of the stored margin as the
-inclusive training threshold, absorbing float32 BLAS differences; this matches
-the frozen training-runtime decisions on all 27,811 cached internal and
-external feature rows.
-
-The runtime pins both the immutable Hub revision and the NPZ SHA-256, loads
-with `allow_pickle=False`, and rejects any field, shape, class, activation, or
-non-finite-value drift. `RAIW_SOURCE_CLASSIFY_WEIGHTS` is the offline override.
-The `source-classify` extra adds `pixels` and Hugging Face Hub but no Torch or
-Transformers. `identify` never imports or runs this path. Its output names a
-complete source/export pipeline and is not SynthID detection. Unit contracts
-and the threshold mutation guard live in `tests/test_source_classify.py`;
-evaluation and attack limits live in
+expands the 892-d vector to 956-d with 64 cross-channel chroma, radial-slope,
+Nyquist-grid, and azimuthal-anisotropy features, and scores 10 global provider
+units and their subfamily sub-units in pure NumPy from a pickle-free `.npz`
+(`multi-provider-source-v3.npz`, `allow_pickle=False`, verified by SHA-256 from
+`wiltodelta/raiw-source-classify` or overridden via
+`RAIW_SOURCE_CLASSIFY_WEIGHTS`). It applies positive-part zero-inflation
+sub-unit pooling (`alpha * (s - base_offset)` only when `s > base_offset`),
+computes damped cross-AI margins ($\gamma = 0.60$), and runs a stacked Stage-2
+`HistGradientBoosting` tree head for version attribution. The `source-classify`
+extra adds `pixels` and Hugging Face Hub but no Torch or Transformers. It
+always sets `watermark_truth="unknown"` and is never imported by `identify`.
+Unit and mutation tests live in `tests/test_source_classify.py`; evaluation and
+attack limits live in [`source-classify-hf/README.md`](source-classify-hf/README.md) and
 [`synthid-classifiers.md`](synthid-classifiers.md).
-
-`source_classify_v2.py` provides a separate, opt-in `classify_image_source`
-entry point. Its NPZ schema contains only complex spectral filters, spatial
-templates, and thresholds; the runtime pins the Hub revision and SHA-256,
-rejects unknown fields and invalid shapes, and never loads pickles. The result
-has `watermark_truth="unknown"` even when a provider pattern matches. A
-simultaneous provider match abstains. `PROVIDERS` exports only the calibrated
-provider labels for callers that route processing from a source hint. Tests in
-`tests/test_source_classify_v2.py` cover the public seam and changed-threshold
-behavior; the [model card](image-source-hf/README.md) records the frozen
-aggregate evidence and limits. This does not change the earlier
-`classify_source` API.
 
 The CLIP loader suppresses discarded random parameter initialization with
 Transformers' `no_init_weights` context before applying the complete frozen
@@ -2568,6 +2560,179 @@ OpenAI floor to 0.15625; that does not change the engine decision. Explicit
 Chroma uses the spread-derived 0.20, verified clean three times on both holdout
 carriers, and `auto` routes OpenAI to qwen-zimage.
 
+An experimental source-restoration path found a narrower positive operating
+point for complex savory-food photographs on 2026-10-19. Development first ran
+Chroma at strength 0.125 and seed 0, then kept only a model-specific frequency
+band from that candidate in all YCrCb channels with 20% cosine transitions. The
+fixed Flare band covered periods from 32 to 10 pixels; the fixed Sunburst band
+covered periods from 32 to 8 pixels. The development set produced three joint
+quality-and-oracle passes in four food scenes, with both dated models
+represented, before any qualification sources were generated.
+
+The preregistered qualification then used four new fixed savory-food prompts on
+each model. All eight metadata-free source controls returned official OpenAI
+SynthID `detected`. Six of eight final outputs returned `not_detected`, five of
+eight passed the frozen quality gates, and the same five passed both conditions:
+2/4 Flare and 3/4 Sunburst. Every quality-positive output was therefore also
+oracle-negative. Those five had minima of 30.14 dB grayscale PSNR, 0.9289
+grayscale SSIM, and 0.9151 tolerant edge F1. The sixth oracle-negative output,
+a Sunburst shakshuka scene, missed the fixed PSNR and SSIM gates, so it cannot
+raise the joint result to the preregistered 6/8 target. All eight source/output
+pairs passed native 1024 x 1024 visual review. The hash-bound result is
+`.local-eval/openai-causal-watermark-benchmark-v1/attempt-18-savory-food-qualification-result.json`
+(SHA-256 `43c86aed9c1c5bea8ed86ec8850a0384125a4fd69a0fe447b8a6fbb3e9436f1b`).
+Postqualification development first applied one deterministic rule to the three
+quality failures: keep the default band when it passes, otherwise choose the
+fixed-grid band that retains the largest RGB RMS candidate delta while passing
+all three quality gates. All three strength-0.125 candidates remained official
+`detected`. Raising the base strength to 0.15 for two priority rows and 0.20 for
+all three also produced quality-positive outputs, but all five remained
+`detected`. Further quality-positive variants isolated phase and magnitude,
+changed the phase band, blended phase with magnitude, masked the residual by
+texture, and clipped its vector length; global color correction did not improve
+the quality frontier. Every one of the nine additional oracle checks remained
+`detected`. The 17 bound development checks are recorded in
+`.local-eval/openai-causal-watermark-benchmark-v1/attempt-18-postqualification-development-result.json`
+(SHA-256 `8f9484fb161d855e7ce2f3056bb8f1ec177bebdd615a18cc354be9173ed1d3b0`).
+These local variants therefore add no sixth joint pass through strength 0.20;
+the next qualification changes content coverage rather than tuning these three
+postqualification failures further.
+This qualifies a five-source, two-model savory-food operating point for further
+research. It does not establish a content-wide removal rate, change Chroma's
+flat 0.20 OpenAI floor, add source restoration to the installed pipeline, or
+cover other content, dimensions, strengths, seeds, or model releases.
+
+A preregistered source-fresh expansion then tested the positive brothy-bowl
+subset rather than tuning the failed rows. Four new prompts - laksa, chicken
+noodle soup, miso ramen, and mandu-guk - were generated once on each dated
+model. The method and success rule were frozen before generation: Chroma at
+strength 0.125 and seed 0, the same model-specific bands and transition, at
+least six joint passes overall, and at least two per model. All eight
+metadata-free source controls returned official OpenAI SynthID `detected`; all
+eight final outputs returned `not_detected` and passed the fixed quality gates,
+for 4/4 Flare, 4/4 Sunburst, and 8/8 overall. C2PA was absent from every source
+and output check. The final candidates had minima of 30.12 dB grayscale PSNR,
+0.9095 grayscale SSIM, and 0.8838 tolerant edge F1, and all eight pairs passed
+native 1024 x 1024 visual review. The hash-bound result is
+`.local-eval/openai-causal-watermark-benchmark-v1/attempt-19-brothy-bowl-qualification-result.json`
+(SHA-256 `0fb120cc331029b3fa62e9cc91aa01de64c5b467b45d59b53faa213a1dec43b1`).
+This qualifies the frozen compositor for these brothy-bowl photo prompts on the
+two dated models. It does not cover other food structures, arbitrary scenes or
+dimensions, different Chroma settings, other model releases, or the installed
+removal path. The initial standalone implementation required the exact dated
+source model. A clean invocation reproduced all eight oracle-checked
+qualification outputs byte-for-byte; the bound parity report is
+`.local-eval/openai-causal-watermark-benchmark-v1/attempt-19-script-parity-result.json`
+(SHA-256 `066a169557dfc327257dd67dbf0cfe323a20cf1628e474bfa17e74bd3d7dc0c8`).
+
+A later development pass replaced the model selector with one deterministic
+quality-adaptive rule. For each Chroma strength-0.125 candidate, it evaluated a
+frozen high-period grid from 4 to 16 pixels under the same 32-pixel low cutoff,
+kept variants passing PSNR >= 30 dB, SSIM >= 0.90, and tolerant edge F1 >= 0.75,
+then selected the largest RGB RMS change. A one-seed source-fresh qualification
+reached 13/16 joint passes. Development on only those three misses added seed 1
+and cleared two of them, so the next method was frozen before another source
+set was generated: evaluate seeds 0 and 1, maximize RGB RMS change among all
+quality-positive variants, then break exact ties by lower seed and smaller high
+period. The rule has no model input.
+
+The preregistered two-seed qualification generated eight new brothy-bowl prompts
+once on each dated model. The success rule required at least 14/16 joint passes,
+at least 6/8 per model, 16/16 detected source controls, 16/16 numeric quality
+passes, and 16/16 native visual passes. All 16 source controls returned official
+OpenAI SynthID `detected`; all 16 selected outputs returned `not_detected` and
+passed every other condition, for 8/8 Flare, 8/8 Sunburst, and 16/16 overall.
+The final candidates selected seed 0 seven times and seed 1 nine times. Their
+metric minima were 30.02 dB grayscale PSNR, 0.9000 grayscale SSIM, and 0.8280
+tolerant edge F1. The hash-bound result is
+`.local-eval/openai-causal-watermark-benchmark-v1/attempt-26-two-seed-qualification-result.json`
+(SHA-256 `79f36d144d90aa92103ea8b11a42560cbf5655fd282eb917327ab03d8b08d089`).
+
+The next preregistered source-fresh qualification kept that selector unchanged
+and tested an adjacent class of 16 non-brothy complex savory-food photographs,
+with the same eight prompts generated once on each dated model. All 16
+metadata-free source controls returned official OpenAI SynthID `detected`, and
+all 16 selected outputs passed the fixed quality gates and native visual review.
+Only one output returned `not_detected`, however: 1/8 Flare and 0/8 Sunburst,
+for 1/16 overall against a frozen target of 12/16 and at least 6/8 per model.
+The metric minima were 30.02 dB grayscale PSNR, 0.9330 grayscale SSIM, and
+0.9234 tolerant edge F1. C2PA was absent from all 32 checks. The hash-bound
+result is
+`.local-eval/openai-causal-watermark-benchmark-v1/attempt-27-two-seed-qualification-result.json`
+(SHA-256 `8752cfd630638d6bed647d3b84a31d4580aa6180a7c19be2d0254fe51b89b1d6`).
+The qualified operating point therefore remains limited to the tested
+brothy-bowl structure; RGB RMS maximization under the three fidelity gates is
+not a sufficient content-independent selector for the adjacent food class.
+
+Development on that completed corpus isolated the next engineering target.
+None of the 32 full Chroma candidates passed the numeric gates; even their
+maxima were only 24.17 dB PSNR and 0.7366 SSIM. Of 13 candidates that received a
+usable official response before the API allowance was exhausted, 11 returned
+`not_detected` and two returned `detected`. The remaining 19 have no usable
+verdict, so 11/13 is a partial diagnostic rather than a removal rate. The bound
+record is
+`.local-eval/openai-causal-watermark-benchmark-v1/attempt-27-full-chroma-development-result.json`
+(SHA-256 `c2604b160ed0b5b66b9f9bd5c5b7db640f29e7f7a1c35e82fa351e8d4f0de57d`).
+
+A development-only compositor then restored the source Y channel and retained
+the full Chroma candidate's Cr and Cb channels. A metric-only frozen rule chose
+the largest chroma fraction passing every gate, then the lowest RGB distortion
+and lower seed; all 16 rows selected the full chroma fraction. All 16 passed
+native visual review, with minima of 51.99 dB PSNR, 0.9996 SSIM, and 0.9964 edge
+F1. After the API allowance recovered, all 13 submitted rows returned official
+`detected`; the other three retained their explicit rate-limit refusals. The
+maximum possible result is therefore only 3/16 even if every refused row were
+clean, with corresponding maxima of 2/8 Flare and 1/8 Sunburst, so the frozen
+12/16 and 6/8-per-model target is mathematically unreachable. The Web surface
+separately returned three `indeterminate` responses and 13 route-level
+`unreachable` results, none of which is interpreted as clean. In this matrix,
+restoring the complete source luminance channel restored fidelity but retained
+the detectable signal. Its bound record is
+`.local-eval/openai-causal-watermark-benchmark-v1/attempt-28-source-luma-development-result.json`
+(SHA-256 `0bb847cc21cb4e25808e60798a3b8c25b963b097d002890a096978434bc8d8e4`).
+
+The next development pass retained the full Chroma candidate's chroma channels
+and replaced only low-frequency luminance with the candidate, restoring source
+luminance above a metric-selected radial cutoff. The frozen grid selected a
+12-pixel period once, 16 pixels ten times, and 20 pixels five times. All 16
+outputs passed the numeric gates and native 2048 x 1072 visual review, with
+minima of 30.07 dB PSNR, 0.9533 SSIM, and 0.9479 edge F1. All 16 nevertheless
+returned official `detected`, split 8/8 Flare and 8/8 Sunburst. Restoring the
+full source amplitude above one hard luminance cutoff therefore does not provide
+the required separation on this corpus. The bound record is
+`.local-eval/openai-causal-watermark-benchmark-v1/attempt-29-luma-detail-development-result.json`
+(SHA-256 `3d0095986aeec1dbb473832953f642b97b854ada51d39ab3c9acc7ba1fda71b5`).
+
+A final development pass attenuated rather than fully restored the source's
+high-frequency luminance. A metric-only grid selected the seed, cutoff, and
+source gain; all 16 selected outputs passed the fixed quality gates, with minima
+of 30.06 dB PSNR, 0.9533 SSIM, and 0.8993 edge F1. The local report is
+`.local-eval/openai-causal-watermark-benchmark-v1/attempt-30-attenuated-luma-detail-development.json`
+(SHA-256 `00e620b1bc9da26e6eb9e91b2f9a1ef7213423652492d017ba1bcc8676d1d012`).
+The bounded official pass stopped after the provider allowance was exhausted:
+six usable responses all returned `detected`, one request returned an explicit
+rate-limit refusal, and nine frozen rows were never submitted. This partial
+coverage is not a removal rate, but six detected results provide no positive
+reason to continue spending oracle calls on this compositor family. Together
+with attempts 28 and 29, it closes the source-restoration coefficient loop on
+this consumed corpus; another scalar interpolation is not the next research
+step.
+
+[`scripts/restore_source_band.py`](../scripts/restore_source_band.py) now
+implements that model-independent selector. It requires the source plus the
+seed-0 and seed-1 Chroma candidates, refuses dimensions outside the qualified
+1024 x 1024 scope or sample-type drift, writes a new metadata-free PNG, and
+records its inputs, selected seed and cutoff, metrics, and output by hash in a
+JSON report. A clean invocation reproduced all 16 oracle-checked qualification
+outputs byte-for-byte; the bound parity report is
+`.local-eval/openai-causal-watermark-benchmark-v1/attempt-26-script-parity-result.json`
+(SHA-256 `7a5a2084b02fb73c1dfed2c7b6962f222b76ca4754c8f3bf75aeab18a7aeff95`).
+
+```bash
+uv run --script scripts/restore_source_band.py \
+  SOURCE.png CHROMA_SEED_0.png CHROMA_SEED_1.png OUTPUT.png
+```
+
 A separate content-balanced check on 2026-08-31 tested the exact production
 OpenAI and Meta floors over 19 prompt-matched image strata per provider. Each
 engine ran in its own sequential H100 invocation, and the comparison isolated
@@ -2871,6 +3036,81 @@ both in the official OpenAI Content Provenance API. The Flare output measured
 their sources. Those fidelity numbers describe two neutral studio-photo
 carriers, not a content-wide quality estimate, and the source-positive/output-negative
 oracle pairs do not replace the wider OpenAI calibration that set the floor.
+
+A preregistered source-fresh replication on 2026-10-18 narrowed that result to
+an explicit neutral-studio content class and expanded it to six independent
+sources. Two fixed prompts - one matte sphere and one frosted bottle on smooth
+cyclorama backgrounds - were generated once across `gpt-image-2`,
+`gpt-image-2.5-flare`, and `gpt-image-2.5-sunburst`. All six pixel-identical
+metadata-stripped controls returned official OpenAI SynthID `detected`. The
+same frozen complete `qwen-zimage` profile at 0.09375, seed 0, with no source
+pixel restoration returned `not_detected` on all six; C2PA was absent for every
+oracle check. Against their own sources, the outputs measured 38.34-41.50 dB
+grayscale PSNR, 0.9787-0.9874 grayscale SSIM, and 0.7645-0.9915 tolerant edge
+F1, and all six passed native 1024 x 1024 visual review. The immutable final
+report is `.local-eval/openai-causal-watermark-benchmark-v1/attempt-12-final-report.json`
+(SHA-256 `ea21748e85c3236e14333758797f3286ae455c5f9c325d91c49b260be1906fd1`).
+This is a positive operating point for simple, smooth neutral studio carriers;
+it does not qualify 0.09375 for faces, text, detailed photographs, or the flat
+OpenAI production route, and therefore does not lower the 0.15625 provider
+floor.
+
+A second preregistered source-fresh qualification on the same date extended the
+positive result to product materials with fine detail. Four new fixed prompts -
+an angular painted-wood prism, speckled ceramic mug, stitched leather notebook,
+and brushed-steel coffee pot - were generated once across the same three dated
+OpenAI models. The frozen method first ran the complete `qwen-zimage` profile at
+0.09375 and seed 0, then kept the candidate's low and medium frequencies while
+restoring source frequencies above 1/8 cycle per pixel in YCrCb with a 20%
+cosine transition. The preceding 12-source development matrix showed why both
+stages matter: the base profile removed the signal on 12/12 but cleared the
+fixed fidelity gates on only 6/12, while the compositor cleared them on 12/12
+and retained `not_detected` on all six textured development cases. All 12 fresh
+metadata-stripped controls returned official OpenAI SynthID
+`detected`, and all 12 final candidates returned `not_detected`; C2PA was absent
+for every check. Each prompt stratum qualified 3/3. Against their own sources,
+the final candidates had minima of 36.13 dB grayscale PSNR, 0.9712 grayscale
+SSIM, and 0.8368 tolerant edge F1, and all 12 passed native 1024 x 1024 visual
+review. The immutable final report is
+`.local-eval/openai-causal-watermark-benchmark-v1/attempt-15-final-report.json`
+(SHA-256 `6508df525ea7dfd22e8b405e2d4b10d3e4795c5b5aa3c74a2325e0f73cd35d70`).
+This qualifies a narrow detail-preserving route for these simple product-photo
+strata. It does not cover people, text, natural scenes, arbitrary resolutions,
+or other seeds, and it does not lower the flat OpenAI production floor.
+[`scripts/restore_source_detail.py`](../scripts/restore_source_detail.py) is the
+tracked offline implementation of the qualified compositor. It has no tunable
+cutoff: it reproduces the frozen 1/8 cycle-per-pixel YCrCb split and 20% cosine
+transition, refuses shape or sample-type drift, writes a new metadata-free PNG,
+and records the three input/output hashes. It is intentionally outside the
+installed removal path until a wider content qualification supports such a
+public promise.
+
+```bash
+uv run --script scripts/restore_source_detail.py SOURCE.png QWEN_CANDIDATE.png OUTPUT.png
+```
+
+The next preregistered expansion measured that missing coverage instead of
+generalizing from the product-photo result. Attempt 16 generated 16 fresh
+complex scenes across architecture, botany, food, and landscape, with four
+sources per stratum and two current dated OpenAI models. All 16 metadata-free
+source controls returned official OpenAI SynthID `detected`. Applying the
+attempt-15 1/8 cycle-per-pixel split cleared the fixed fidelity gates on 0/16;
+its minima were 21.91 dB grayscale PSNR, 0.8131 grayscale SSIM, and 0.8844
+tolerant edge F1. Restoring source frequencies above 1/32 cycle per pixel
+cleared the fidelity gates on 13/16, but every one of the 16 candidates returned
+official `detected`. A fixed 12-cell intermediate-band matrix returned nine
+`detected` and three `not_detected`, while its best local band cleared the
+fidelity gates on 10/16 and none of the tested bands covered botany. Lowering
+Qwen strength to 0.0625, 0.07675, or 0.08125 before the 1/8 split cleared the
+fidelity gates on at most 1/16. The result is a measured content boundary: the
+tracked compositor reproduces the qualified product-photo method, but it is not
+a general natural-scene restoration stage. The bound local records are
+`candidates-attempt-16-final/detail-restoration-manifest.json` (SHA-256
+`b614538cb259b201aec96fd77b9005f3ac66a1f339f7067bbcf8a48e8a7c2212`),
+`candidates-attempt-16-period32/period32-manifest.json` (SHA-256
+`9d6fa883acbb95076107bb4682ebd42f28786f5353f215194409b275ee2ebb1c`),
+and `candidates-attempt-16-band-matrix/band-matrix-manifest.json` (SHA-256
+`c5346419e70b139c262f72d64600aeebe1628ae878cb8e8dce0c4011fe1148f3`).
 
 The source-fresh 2026-09-21 expansion supplied that wider calibration. Six
 independent `gpt-image-2` API generations - three YuNet-positive and three

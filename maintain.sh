@@ -5,7 +5,7 @@ set -euo pipefail
 uv sync --all-extras
 # uv-outdated / uv-secure run via uvx (isolated env), NOT `uv run`: resolving them
 # inside the project env crashes and, with set -e, aborts the whole gate before
-# ruff/pyright/tests (see CLAUDE.md "Test and lint").
+# ruff/pyright/tests.
 uvx uv-outdated
 # Findings and scanner failures both stop the gate, even if a success message
 # preceded a failure. Scan only this lockfile, not sibling worktree copies.
