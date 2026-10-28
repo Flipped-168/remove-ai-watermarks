@@ -1,4 +1,4 @@
-name: Sync upstream
+name: Sync wiltodelta/remove-ai-watermarks
 on:
   schedule:
     - cron: '0 2 * * *'
@@ -16,19 +16,26 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-      - name: Add upstream
-        run: git remote add upstream https://github.com/wiltodelta/remove-ai-watermarks.git || true
-      - name: Fetch upstream
-        run: git fetch upstream
-      - name: Merge upstream (ours strategy)
+      - name: Add wiltodelta/remove-ai-watermarks
+        run: git remote add wiltodelta/remove-ai-watermarks https://github.com/wiltodelta/remove-ai-watermarks.git || true
+      - name: Fetch wiltodelta/remove-ai-watermarks
+        run: git fetch wiltodelta/remove-ai-watermarks
+      - name: Merge wiltodelta/remove-ai-watermarks (ours strategy)
         run: |
-          git merge upstream/HEAD --no-edit -X ours || git merge FETCH_HEAD --no-edit -X ours
+          git merge wiltodelta/remove-ai-watermarks/HEAD --no-edit -X ours || git merge FETCH_HEAD --no-edit -X ours || true
+          git diff --name-only --diff-filter=U | while IFS= read -r f; do
+            case "$f" in
+              .github/workflows/sync-wiltodelta/remove-ai-watermarks.yml) ;;
+              .github/workflows/*) git rm -f "$f" ;;
+              *) git checkout --ours -- "$f" || true ;;
+            esac
+          done
       - name: Keep only our workflow
         run: |
           mkdir -p .github/workflows
-          find .github/workflows -type f ! -name "sync-upstream.yml" -delete
+          find .github/workflows -type f ! -name "sync-wiltodelta/remove-ai-watermarks.yml" -delete
       - name: Commit and push
         run: |
-          git add .github/workflows
+          git add -f .github/workflows
           git commit -m "chore: preserve fork sync workflow" --allow-empty
           git push
